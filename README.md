@@ -1,159 +1,93 @@
-# Multi Market Arbitrage Research
+# polymarket-pair-maker
 
-Read-only market-data correctness and replay infrastructure for quantitative
-execution research. The implemented Phase 1 collector/scanner is Polymarket-only;
-Kalshi, Kraken, multi-venue semantics and trading execution remain later gated
-work, not current production capabilities.
+Research-grade Polymarket liquidity-reward market making with adaptive YES/NO quoting, conservative execution modelling, inventory risk control, and deterministic replay.
 
-**Planned venues:** Polymarket, Kalshi, Kraken
-**Architecture:** Python modular monolith
-**Current project state:** Phase-1 Gate-1 audit-divergence remediation; first six-hour soak remains failed
+The objective is to develop and validate selective liquidity provision on the
+international Polymarket CLOB. Decisions must maximize realistic risk-adjusted net
+profitability after adverse selection, execution costs, reward uncertainty, and
+capital exposure. `NO_QUOTE` is a valid and often optimal decision.
 
-**Live trading:** Structurally unavailable in Phase 1
+The current code provides a **read-only market-data and replay foundation**.
+The market-making decision engine, maker-fill simulator, inventory accounting,
+reward estimator, and paper-order lifecycle are specified for the next task and
+are not implemented. Live order placement is structurally unavailable.
 
-## Engineering priorities
+## Read first
 
-1. Correctness and data integrity
-2. Realistic execution modelling
-3. Reproducibility and provenance
-4. Reliability
-5. Risk control and recoverability
-6. Performance
-7. Feature breadth
+| Document | Authority |
+| --- | --- |
+| [Project specification](docs/PROJECT_SPEC.md) | Scope, operational modes, deliverables, and implementation status |
+| [Architecture](docs/ARCHITECTURE.md) | Module ownership, data flow, compatibility, and runtime policy |
+| [Invariants](docs/INVARIANTS.md) | Required correctness and safety contracts |
+| [Strategy specification](docs/STRATEGY_SPEC.md) | Normative contract for Prompt 2 |
+| [Research basis](docs/RESEARCH_BASIS.md) | Sources, findings, and implementation consequences |
+| [Validation gates](docs/VALIDATION_GATES.md) | Migration, implementation, and independent acceptance |
+| [Roadmap](docs/ROADMAP.md) | The agreed three-task sequence |
+| [Accepted decisions](docs/ADR/0001-foundation-and-safety-boundaries.md) | Foundation and compatibility decisions |
+| [Historical evidence](docs/historical/README.md) | Preserved failed-soak evidence and access limitations |
 
-An apparent arbitrage is not treated as executable until data health, settlement/payoff semantics, executable depth, current costs, latency, fills, leg risk, capital use, and relevant venue constraints are validated.
+## Development
 
-## Start here
-
-- [`docs/DESIGN_INDEX.md`](docs/DESIGN_INDEX.md) — read first; documentation map and implementation read order
-- [`docs/DOCUMENT_GOVERNANCE.md`](docs/DOCUMENT_GOVERNANCE.md) — document authority and conflict rules
-- [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md) — product/system contract
-- [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — canonical architecture
-- [`docs/INVARIANTS.md`](docs/INVARIANTS.md) — hard system invariants
-- [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terminology
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — gate-driven path to controlled live deployment
-- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — staged engineering sequence and current remediation
-- [`docs/GATE_1_FAILURE_20260822.md`](docs/GATE_1_FAILURE_20260822.md) — evidence summary for the failed first six-hour soak
-- [`docs/GATE_1_REMEDIATION_SPEC.md`](docs/GATE_1_REMEDIATION_SPEC.md) — normative correction and rerun requirements
-- [`docs/GATE_1_SOAK_SPEC.md`](docs/GATE_1_SOAK_SPEC.md) — unchanged Gate-1 acceptance contract
-- [`docs/adr/0054-audit-divergence-state-and-gate-eligibility.md`](docs/adr/0054-audit-divergence-state-and-gate-eligibility.md) — immediate fail-closed audit-divergence recovery and Gate semantics
-- [`docs/PHASE_2_RESEARCH_AND_SPEC.md`](docs/PHASE_2_RESEARCH_AND_SPEC.md) — planning-only multi-venue/semantic specification; production work remains blocked
-- [`docs/EXTERNAL_REFERENCE_BACKLOG.md`](docs/EXTERNAL_REFERENCE_BACKLOG.md) — non-normative external systems, strategy priorities, and future ADR candidates
-- [`docs/ADR_INDEX.md`](docs/ADR_INDEX.md) — architecture decision index
-
-Historical pass reports and adversarial reviews live under `docs/design_freeze/`. They are audit evidence, not current implementation authority.
-
-## Current gate
-
-The first six-hour Polymarket soak ran from:
-
-```text
-a382b93220011428703fe02483f7034f59c1f045
-```
-
-The independent artifact review returned:
-
-```text
-GATE 1: FAIL
-```
-
-The raw journal, dual replay, analytical rebuild, raw immutability and no-live boundary passed. Gate 1 failed because:
-
-- four primary deterministic book-invariant violations exposed incomplete multi-frame reported-top transition handling;
-- `scan-report` attempted to materialize approximately 819.6 MiB against the valid 512 MiB bound;
-- monotonic checkpoint chronology and typed per-interval availability causality were not retained completely.
-
-Those findings remain historical and the failure dataset is preserved as a
-permanent regression corpus. The original reported-top, bounded reporting,
-monotonic checkpoint and interval defects have remediation implementations.
-Follow-up causal analysis found that a matching state often appears only after
-mismatch-triggered recovery, so ADR-0054 retains every mismatch, immediately
-fails closed, and permits current eligibility restoration only after a separate
-authoritative resnapshot, replacement capture and exact lifecycle/interval
-reconciliation. Replacement capture requires full snapshots for every required
-instrument from one new WebSocket connection after durable canonical
-processing, with same-epoch nonfuture sources no older than
-`scanner.maximum_book_age` at completion. REST resolution, stale/future/cross-
-epoch coverage, socket readiness, incrementals or partial coverage cannot restore
-eligibility. It does not accept same-generation waiting as a live closure.
-
-Gate 1 remains `FAIL`. A new final-SHA 60-second smoke and 45–60 minute
-stability observation are still required before independent pre-soak review.
-A fresh six-hour soak is mandatory only after later independent authorization;
-no six-hour rerun was performed for the ADR-0054 remediation.
-
-Phase-2 research may continue in parallel. Production Kalshi, Kraken, semantic-engine, paper/shadow or live implementation must not be merged or promoted until Gate 1 receives an accepted `PASS`.
-
-## Phase 1 development
-
-Clone the repository:
+Use ordinary-GIL CPython **3.14.7** and **uv 0.12.5**, as declared in
+`.python-version` and `pyproject.toml`. Direct dependencies and transitive
+dependencies are pinned. Run commands from the repository root.
 
 ```bash
-git clone https://github.com/ntua-el21026/multi-market-arbitrage.git
-cd multi-market-arbitrage
-```
-
-The reproducible baseline is ordinary-GIL CPython 3.14.7 with `uv==0.12.5`, exact direct dependency pins, and a committed transitive lock:
-
-```bash
+git clone git@github.com:ntua-el21026/polymarket-pair-maker.git
+cd polymarket-pair-maker
 uv python install
 uv lock --check
 uv sync --frozen --all-groups
-uv run --frozen --all-groups mma --help
+uv run --frozen --all-groups ppm --help
 ```
 
-The public/read-only commands include:
+The public-data CLI supports bounded observation and calibration, raw-journal
+replay, analytical reconstruction, and integrity validation:
 
 ```bash
-uv run --frozen --all-groups mma observe polymarket --gamma-market-id <id> --duration 30 --config config/phase1.toml
-uv run --frozen --all-groups mma calibrate polymarket --gamma-market-id <id> --duration 180 --output data/calibration/<fresh-run> --config config/phase1.toml
-uv run --frozen --all-groups mma replay data/raw --run-id <collector-run-id> --config config/phase1.toml
-uv run --frozen --all-groups mma rebuild-analytical data/raw --output data/rebuilt/<collector-run-id> --run-id <collector-run-id> --config config/phase1.toml
-uv run --frozen --all-groups mma validate-data data
-uv run --frozen --all-groups mma scan-report data/analytical
+uv run --frozen --all-groups ppm observe polymarket --duration 60 --gamma-market-id <id> --config config/phase1.toml
+uv run --frozen --all-groups ppm replay data/raw --run-id <run-id> --config config/phase1.toml
+uv run --frozen --all-groups ppm rebuild-analytical data/raw --output data/rebuilt/<run-id> --run-id <run-id> --config config/phase1.toml
+uv run --frozen --all-groups ppm validate-data data
 ```
 
-See [`docs/PHASE_1_IMPLEMENTATION.md`](docs/PHASE_1_IMPLEMENTATION.md) for the current pre-soak implementation behavior and [`docs/GATE_1_REMEDIATION_SPEC.md`](docs/GATE_1_REMEDIATION_SPEC.md) for the validation still required.
+Observation and calibration contact external public services. Replay and local
+checks do not require venue credentials. Store runs under ignored `data/`,
+preserve raw manifests, and rebuild only into a fresh directory disjoint from the
+raw journal. `replay --expect-terminal-hash <hash>` compares against a separately
+recorded terminal hash for the same processor contract and configuration.
 
-## Source, configuration and data
-
-| Component | Location and responsibility |
-| --- | --- |
-| CLI | [Command parser](src/multi_market_arbitrage/cli/main.py); bounded observation, calibration, replay, validation and reporting |
-| Venue and pipeline | [Polymarket adapter](src/multi_market_arbitrage/venues/polymarket/) and [canonical processing](src/multi_market_arbitrage/pipeline/) |
-| Durable evidence | [Journal](src/multi_market_arbitrage/journal/), [replay](src/multi_market_arbitrage/replay/) and [analytical storage](src/multi_market_arbitrage/storage/) |
-| Research checks | [Complete-set scanner](src/multi_market_arbitrage/scanners/polymarket_complete_set/) and [test suites](tests/) |
-| Runtime policy | [phase1.toml](config/phase1.toml), including storage bounds, freshness, public-read budgets and recorded-order replay |
-
-Run commands from the repository root. Default local outputs are `data/raw`,
-`data/analytical` and `data/health`; captured runs are excluded from Git. A clean
-clone supplies source, specifications and synthetic test fixtures, rather than
-the private six-hour failure journal. An authorized holder must supply that
-unchanged capture and its run identity to reproduce its historical findings.
-
-Replay accepts an optional `--expect-terminal-hash` to compare an independently
-recorded terminal state. Analytical reconstruction requires a fresh output
-directory whose parent exists and which is disjoint from the raw journal.
-Preserve source journals and manifests when sharing a replay; copying only
-derived Parquet files does not reproduce capture ordering or provenance.
-
-## Offline validation and evidence
-
-With the declared Python environment synchronized, run the synthetic/local suites:
-
-~~~bash
+```bash
+uv run --frozen --all-groups ruff check .
+uv run --frozen --all-groups ruff format --check .
+uv run --frozen --all-groups pyright
 uv run --frozen --all-groups pytest -q
-~~~
+uv run --frozen --all-groups pre-commit run --all-files
+uv build
+```
 
-This suite exercises journal faults, replay, book invariants, reference comparisons,
-freshness and data-validation boundaries. A test pass does not replace the required
-smoke, stability observation, independently authorized six-hour soak or Gate-1
-acceptance. The retained failure and zero-candidate observations remain evidence,
-not profitability estimates. Public observation commands above contact external
-services; they are not prerequisites for an offline code review.
+Dependency-audit instructions and the distinction between local checks and
+empirical acceptance are in [Validation gates](docs/VALIDATION_GATES.md).
+GitHub Actions remains owner-paused; local commands provide reviewable evidence.
 
-Maintained by **Michail Athanasios Peppas**.
+## Acceptance and deployment status
 
-## Data handling
+The first six-hour collector soak returned **`GATE 1: FAIL`**. Raw preservation
+and deterministic replay succeeded in that historical review, while book-state
+correctness, bounded reporting, and completeness of recovery/availability
+evidence required remediation. Relevant regressions remain in the test suite.
+The migration does not replace a fresh independently accepted collector run.
 
-Collected market data, credentials, live state, and large research artifacts must not be committed to Git.
+The full failed journal is an external input and is absent from a clean clone.
+The repository contains byte-preserved failure reports and sanitized regression
+fixtures, with their integrity metadata. See the
+[historical evidence index](docs/historical/README.md) before reproducing claims.
+
+Live deployment remains blocked pending explicit authorization, independent
+acceptance, and authoritative verification of legal and geographic eligibility,
+including the unresolved restrictions affecting access from Greece. A venue
+geographic-check endpoint alone cannot establish legal eligibility. There is no
+paper-to-live switch, signer, wallet configuration, or live-order command.
+
+Maintained by **Michail Athanasios Peppas**. Credentials, collected journals,
+checkpoints, and large research artifacts belong outside tracked source.

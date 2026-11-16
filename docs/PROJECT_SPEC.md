@@ -1,228 +1,70 @@
-# Project Specification
+# Project specification
 
-**Project:** `Multi_Market_Arbitrage`  
-**Design:** v0.1  
-**Status:** Design frozen; implementation pending
+## Objective and scope
 
-## 1. Mission
+`polymarket-pair-maker` develops and validates a selective liquidity-provision
+strategy that maximizes realistic risk-adjusted net profitability after adverse
+selection, execution costs, reward uncertainty, and capital exposure. The
+strategy concept is **Conservative Adaptive Pair Making**. Participation is
+optional: `NO_QUOTE` is an affirmative decision when conservative economics do
+not justify exposure.
 
-Build a rigorous multi-venue quantitative arbitrage, market-making, and delta-neutral research platform that can progress opportunities from observation to reproducible research, conservative simulation, shadow paper execution, and—only after explicit safety gates—limited live execution.
+The venue is the **international Polymarket CLOB at polymarket.com**. Polymarket
+US is a separate platform whose incentive and execution rules are outside this
+project's contract. Supported instruments are ordinary binary YES/NO tokens
+belonging to the same verified condition. Negative-risk conversion sets,
+augmented outcomes, ambiguous settlement relationships, and unverified token
+mappings are excluded.
 
-Initial venues:
+Changeable precision, fees, rewards, market status, and exchange rules must come
+from validated and versioned current reference data. Dated local configuration
+and historical fixtures are evidence of their declared dates, rather than proof
+that a rule remains current.
 
-1. Polymarket
-2. Kalshi
-3. Kraken
+## Modes and current status
 
-Additional venues require evidence that expected incremental opportunity exceeds integration, operational, and risk complexity.
+| Capability | Status at migration |
+| --- | --- |
+| Public market discovery, bounded HTTP/WebSocket collection, and explicit-target observation | Implemented; collector acceptance remains unresolved |
+| Exact arithmetic, strict parsing, reference reconciliation, binary complement proof, normalized books, and provenance | Implemented and covered by retained local regressions |
+| Durable raw journals, deterministic recorded-order replay, analytical reconstruction, integrity validation, and structured health evidence | Implemented; historical full-corpus reproduction requires external artifacts |
+| Selective actions `NO_QUOTE`, `QUOTE_YES`, `QUOTE_NO`, `QUOTE_PAIR` | Specified, unimplemented |
+| Reward modelling, conservative maker fills, risk reservations, inventory accounting, and paper-order lifecycle | Specified, unimplemented |
+| Strategy profitability, calibrated fill assumptions, and execution performance | Empirically unvalidated |
+| Authenticated order placement and live deployment | Unimplemented and blocked pending separate authorization, acceptance, and verified eligibility |
 
-## 2. Strategy families
+Implemented operational roles are `OBSERVE`, `RESEARCH`, and `REPLAY`. Research
+currently means data validation and diagnostics. It does not simulate trading.
+Paper execution is an intended deliverable of Prompt 2. No role authorizes
+signed trades or an automatic operational-mode transition.
 
-The architecture must support, without embedding venue-native assumptions into strategy logic:
+## Deliverables and boundaries
 
-- prediction-market complete-set / complementary-payoff arbitrage;
-- multi-outcome and negative-risk / logical-constraint arbitrage;
-- passive pair accumulation and inventory-balanced market making;
-- cross-venue prediction-market economic-relation arbitrage;
-- spot/perpetual funding carry;
-- dated-futures basis / cash-and-carry;
-- future delta-neutral strategies justified by measured evidence.
+The retained foundation supplies immutable observation, canonical data,
+reference validation, binary semantics, reconstruction, replay, diagnostics, and
+reproducible local quality checks. Prompt 2 must build the deterministic strategy,
+fee/reward model, conservative simulator, inventory/risk accounting, and paper
+lifecycle described in [STRATEGY_SPEC.md](STRATEGY_SPEC.md). Prompt 3 must evaluate
+them independently under [VALIDATION_GATES.md](VALIDATION_GATES.md).
 
-Directional prediction is not an initial objective.
+Excluded functionality includes additional venues, exchange synchronization,
+cross-venue settlement, taker-arbitrage strategies, generalized arbitrage graphs,
+arbitrary multi-leg orchestration, funding and derivatives strategies, unrelated
+portfolio management, ML/RL systems, dashboards, distributed services, speculative
+adapters, and infrastructure without a concrete retained requirement. Complete
+YES/NO sets remain relevant settlement and accounting primitives; the old
+complete-set taker scanner is outside the active strategy.
 
-## 3. Non-negotiable principles
+## Deployment gate
 
-\[
-\boxed{
-\text{Correctness}
->
-\text{Realistic execution modelling}
->
-\text{Reproducibility}
->
-\text{Reliability}
->
-\text{Risk control / recoverability}
->
-\text{Performance}
->
-\text{Feature breadth}
-}
-\]
+Legal and geographic eligibility is unresolved, particularly for access from
+Greece. Authoritative verification of the applicable Hellenic Gaming Commission
+entry and its implications is required before any live-capable deployment.
+Venue geoblocking responses are supplementary evidence. They do not establish
+compliance with local restrictions. Research, public observation, replay, and
+paper simulation remain limited to activities permitted in the user's actual
+jurisdiction. Routing through another jurisdiction to evade restrictions is
+outside scope.
 
-The system is:
-
-- invariant-first;
-- fail-closed;
-- provenance-preserving;
-- exact in authoritative financial arithmetic;
-- deterministic under replay;
-- explicit about uncertainty;
-- conservative about fill/cost assumptions;
-- operationally recoverable;
-- incapable of silently promoting research assumptions into live risk.
-
-## 4. Apparent edge is unproven
-
-An observed spread or payoff inconsistency is not an executable arbitrage until all required properties are established:
-
-```text
-valid market data
-+
-known instrument identity
-+
-current reference data
-+
-proven economic/payoff relation
-+
-full executable depth
-+
-precision/minimum constraints
-+
-current applicable costs
-+
-joint leg freshness/coherence
-+
-latency assumptions
-+
-fill mechanics
-+
-leg/non-atomic execution risk
-+
-capital/collateral availability
-+
-venue/account eligibility
-```
-
-Unknown required inputs fail closed.
-
-## 5. Lifecycle separation
-
-Canonical runtime roles:
-
-```text
-OBSERVE
-RESEARCH
-REPLAY
-PAPER_SHADOW
-LIVE
-```
-
-These are structurally distinct capability sets.
-
-`LIVE` is not another role with one boolean changed.
-
-## 6. Initial architecture
-
-- Python modular monolith
-- async I/O at network boundaries
-- single-process/single-host foundation
-- thin venue adapters
-- canonical typed domain model
-- immutable raw journal
-- Parquet + Zstandard canonical/derived datasets
-- DuckDB analytical query layer
-- strict validators
-- deterministic replay
-- structured observability
-- no live execution in the first implementation phase
-
-Future live control state uses an ACID `OperationalStateStore`, initially SQLite on a single authoritative live executor, but that subsystem is not part of the first implementation.
-
-## 7. Source-of-truth hierarchy
-
-Historical market observation:
-
-\[
-\boxed{\text{Immutable Raw Event Journal}}
-\]
-
-Current internal research state:
-
-\[
-\boxed{\text{Validated Canonical State}}
-\]
-
-Current venue rules:
-
-\[
-\boxed{\text{Versioned Reference Data + Provenance}}
-\]
-
-Future live orders/positions/balances:
-
-\[
-\boxed{\text{Venue-Reconciled State}}
-\]
-
-Future realized P&L:
-
-\[
-\boxed{\text{Double-Entry Ledger}}
-\]
-
-## 8. Research standard
-
-Results must identify:
-
-- code commit;
-- data manifest/hash;
-- configuration hash;
-- strategy version;
-- validator versions;
-- cost model version;
-- simulator/fill model version;
-- chronological split definition;
-- OOS status;
-- parameter-search lineage;
-- missing/invalid-data coverage.
-
-Negative results are retained.
-
-## 9. Live safety standard
-
-No live order placement before the live-readiness gates defined in `LIVE_READINESS_AND_PHASE_GATES.md`.
-
-Future live invariants include:
-
-- risk reservation before send;
-- durable intent before external side effect;
-- no blind retry of ambiguous mutations;
-- reconciliation before rearm;
-- no automated external withdrawals;
-- bounded kill/containment behavior;
-- explicit manual activation;
-- no automatic hard-limit expansion.
-
-## 10. Explicit initial non-goals
-
-Do not initially build:
-
-- live trading;
-- microservices;
-- Kubernetes;
-- Kafka/Redpanda;
-- Redis;
-- PostgreSQL/TimescaleDB server;
-- ClickHouse;
-- Rust/C++ services;
-- ML trading decisions;
-- automated semantic approval by AI;
-- production web/mobile dashboard;
-- active-active executors;
-- automated capital scaling;
-- automated external withdrawals.
-
-## 11. Change policy
-
-Frozen decisions change only through an ADR that documents:
-
-- context;
-- prior decision;
-- alternatives;
-- evidence;
-- new decision;
-- consequences;
-- migration implications.
-
-Codex or another implementation agent must not silently redesign the system.
+Live capability requires a separate user-authorized task and independent
+acceptance. Historical or paper profitability does not provide that authorization.

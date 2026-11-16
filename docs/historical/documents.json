@@ -1,0 +1,36 @@
+{
+  "schema": "ppm-historical-document-inventory-v1",
+  "source_commit": "3ece7fe5ebb2aa94ae4993847d69661620b551c4",
+  "files": [
+    {
+      "original_path": "docs/GATE_1_FAILURE_20260822.md",
+      "preserved_path": "docs/historical/GATE_1_FAILURE_20260822.md",
+      "bytes": 5451,
+      "sha256": "0fce5a4da19b2549fe212a1ce43d334a3523661694e384beb140ea8497a5bc8f"
+    },
+    {
+      "original_path": "docs/GATE_1_REMEDIATION_SPEC.md",
+      "preserved_path": "docs/historical/GATE_1_REMEDIATION_SPEC.md",
+      "bytes": 25006,
+      "sha256": "b126a3c200ecbae7c3396a1ed8a8ae5d46c20333ef06140ec878f2c435855bf6"
+    },
+    {
+      "original_path": "docs/GATE_1_SOAK_SPEC.md",
+      "preserved_path": "docs/historical/GATE_1_SOAK_SPEC.md",
+      "bytes": 19794,
+      "sha256": "1b66061855a53129a39e4eada2d3cd658e4efc33d6124dd0a5b47124436486c3"
+    },
+    {
+      "original_path": "docs/adr/0053-bounded-reported-top-transition-state.md",
+      "preserved_path": "docs/historical/0053-bounded-reported-top-transition-state.md",
+      "bytes": 6563,
+      "sha256": "f5fb7a0a02888740c5446953252013285da110708b100bf8842634027cb6b491"
+    },
+    {
+      "original_path": "docs/adr/0054-audit-divergence-state-and-gate-eligibility.md",
+      "preserved_path": "docs/historical/0054-audit-divergence-state-and-gate-eligibility.md",
+      "bytes": 23153,
+      "sha256": "6f7901d0a285330427e9f487f9c6908d57456596935c837edfceb808d8d8ca9a"
+    }
+  ]
+}

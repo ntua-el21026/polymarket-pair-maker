@@ -1,257 +1,71 @@
-# Canonical Invariant Registry
-
-These are hard project-level contracts for Design Freeze v0.1.
-
-## A. Data / domain invariants
-
-### I-01 Raw preservation
-Authoritative canonical market observations trace to captured raw application payloads.
-
-### I-02 Exact economics
-Binary float never determines authoritative prices, quantities, money, costs, P&L, or financial risk limits.
-
-### I-03 Validated-state consumption
-Strategies consume only state satisfying declared health/freshness/reference prerequisites.
-
-### I-04 Sequence/integrity failure
-Detected sequence/checksum/protocol integrity failure invalidates affected sequence-dependent state.
-
-### I-05 No silent loss
-Required market-data events are never silently dropped.
-
-### I-06 Explicit reference versions
-Economic calculations identify applicable versioned reference data.
-
-### I-07 Unknown is not valid
-Unknown required precision, cost, settlement, status, identity, or semantics fails closed.
-
-### I-08 Proven economic relation
-Automated cross-contract reasoning requires the strategy-required `EconomicRelation` with `RelationProofStatus.PROVEN`.
-
-### I-09 Proven outcome partition
-Locked multi-outcome payoff claims require proven mutual exclusivity, exhaustiveness, payout, cancellation, and exceptional-state semantics.
-
-### I-10 Immutable raw history
-Sealed raw journal segments are never modified.
-
-### I-11 Deterministic replay
-Fixed replay inputs produce deterministic canonical/output hashes.
-
-### I-12 Bounded queues
-Every producer/consumer queue is capacity-bounded.
-
-### I-13 Provenance
-Economically material derived records retain required source/reference/config/version provenance.
-
-### I-14 Versioned persisted schemas
-Persisted canonical/reference schemas are explicitly versioned.
-
-### I-15 Scoped ingestion order
-`ingest_seq` is monotonic only within `CollectorRunId`.
-
-### I-16 Scoped monotonic time
-Monotonic timestamps are compared only within the same clock/run epoch.
-
-### I-17 Explicit durability
-Receipt, enqueue, append, durability, sealing, and verification are distinct states.
-
-### I-18 Application payload boundary
-Raw preservation means exact application payload at the collector boundary, not packet capture.
-
-### I-19 Stable identity vs version
-Stable object IDs do not change because metadata/reference versions change.
-
-### I-20 Asset identity
-Display symbols never establish fungibility.
-
-### I-21 Joint opportunity coherence
-Multi-leg opportunities use one explicit immutable jointly coherent input snapshot.
-
-### I-22 Explicit cost context
-Unknown material applicable cost prevents net economic promotion.
-
-### I-23 Subscription semantic provenance
-Subscription options that change interpretation are recorded.
-
-### I-24 Single-owner mutable state
-Mutable state domains have explicit owners; cross-module communication uses bounded message passing/immutable snapshots.
-
-## B. Research invariants
-
-### R-01 Layered economics
-`THEORETICAL`, `BOOK_UPPER_BOUND`, `REPLAY_SIMULATED`, `SHADOW_SIMULATED`, and `LIVE_REALIZED` are distinct.
-
-### R-02 Full-depth sizing
-Aggressive capacity walks actual available depth.
-
-### R-03 Maker non-assumption
-Touch/trade-through is not proof of passive fill.
-
-### R-04 Post-latency execution
-Simulation executes against state available after configured latency.
-
-### R-05 Residual exposure honesty
-Partially hedged positions are explicit open risk.
-
-### R-06 Unknown material cost fails closed
-No zero default.
-
-### R-07 Rebate separation
-Rebates remain separate positive cashflows with explicit certainty.
-
-### R-08 Lifecycle counting
-Repeated observations of one dislocation are not independent opportunities.
-
-### R-09 Shared resource deconfliction
-Aggregate research cannot spend the same liquidity/capital twice.
-
-### R-10 Chronological validation
-Final time-dependent validation does not randomly mix future into past.
-
-### R-11 OOS sanctity
-A holdout used to tune decisions ceases to be OOS.
-
-### R-12 Search-history retention
-All evaluated parameter/config variants are recorded.
-
-### R-13 Missing-data transparency
-Invalid/missing intervals remain in coverage reporting.
-
-### R-14 Conservative promotion
-Promotion relies on plausible conservative/stress evidence, not idealized results alone.
-
-### R-15 Capacity realism
-Profitability is evaluated as a function of size and capital-time.
-
-### R-16 Paper-mode distinction
-Replay simulation and live shadow simulation are reported separately.
-
-### R-17 Conservative terminal inventory
-Open residual inventory cannot disappear or be promoted solely on mid marks.
-
-### R-18 Non-IID awareness
-Raw signal count is not automatically sample size.
-
-### R-19 Deterministic experiment identity
-Code/data/config/simulator/cost/fill versions are recorded.
-
-### R-20 Causal decision boundary
-Future events may determine fills/markouts but cannot retroactively alter order-intent features.
-
-### R-21 Simulator calibration isolation
-Fill/latency models have their own calibration/validation lineage.
-
-### R-22 Scenario provenance
-"Conservative" assumptions identify empirical/policy/stress provenance.
-
-### R-23 Own-liquidity persistence
-Portfolio simulation cannot repeatedly consume the same visible depth.
-
-### R-24 P&L concentration disclosure
-Promotion evidence reports concentration by market/event/time/regime/top-N.
-
-## C. Future live invariants
-
-### L-01 No direct strategy execution
-Strategies never hold venue mutation capability.
-
-### L-02 Durable intent before side effect
-Execution intent/risk state is durably committed before venue mutation.
-
-### L-03 Durable decision evidence
-The market/reference evidence supporting a live command is durably preserved before send.
-
-### L-04 Unknown is not rejected
-Ambiguous live mutation outcome is `UNKNOWN` and reconciled before retry.
-
-### L-05 Risk reserved before send
-Worst plausible fill exposure is atomically reserved before transmission.
-
-### L-06 Timeout does not free risk
-Reservation survives ambiguity.
-
-### L-07 Fill during cancel is valid
-`CANCEL_PENDING` does not imply no further fill.
-
-### L-08 Venue truth dominates
-Venue-reconciled live account state is authoritative.
-
-### L-09 Reconcile before rearm
-Restart/reconnect/critical ambiguity cannot resume new risk before reconciliation.
-
-### L-10 Kill is not flatten
-New-risk halt/cancel and emergency risk-reduction are separate bounded policies.
-
-### L-11 Defense in depth
-Use venue-native safety mechanisms where available without relying on them exclusively.
-
-### L-12 Cancellation capacity
-New-order traffic cannot starve safety cancellation/containment capacity.
-
-### L-13 Hierarchical hard limits
-Strategies cannot override system/venue/account limits.
-
-### L-14 Risk increases controlled
-Risk tightening may be immediate; hard-limit increases require explicit controlled activation.
-
-### L-15 State-contingent prediction risk
-Prediction-market risk evaluates allowed settlement states where applicable.
-
-### L-16 Delta-neutral is not risk-free
-Margin/basis/funding/counterparty/liquidity risks remain explicit.
-
-### L-17 Ledger is realized-P&L authority
-Strategy counters cannot create authoritative realized P&L.
-
-### L-18 No silent reconciliation plug
-Discrepancies require cause and auditable correction.
-
-### L-19 Live secret separation
-Research/paper runtimes cannot load live mutation credentials.
-
-### L-20 No automated external withdrawals
-Trading daemon has no external withdrawal capability.
-
-### L-21 Approved immutable release
-Live starts only from approved release/config identity.
-
-### L-22 No automatic restart into live
-Crash recovery returns to reconciliation/no-new-risk.
-
-### L-23 Eligibility runtime validation
-Geographic/account/market eligibility is current external state, not permanent hard-coded truth.
-
-### L-24 Audit critical controls
-Risk/config/manual/security actions are auditable.
-
-### L-25 Explicit scaling
-No strategy/allocator automatically increases hard capital limits.
-
-### L-26 Approval freshness
-Immediately before send, approval/reservation/kill/venue eligibility are revalidated.
-
-### L-27 Risk authority health
-Unavailable/stale/inconsistent risk subsystem means no new risk.
-
-### L-28 Cancel-all is not terminal proof
-Cancel-all commands require order-state reconciliation.
-
-## D. Engineering invariants
-
-### E-01 Current docs only
-Historical design-freeze terminology is not implementation authority.
-
-### E-02 No silent architecture redesign
-Implementation deviations require explicit ADR.
-
-### E-03 Typed error discipline
-Expected invalidity, infrastructure failure, configuration fault, and programming invariant violation remain distinct.
-
-### E-04 No broad exception swallowing
-Supervisor boundaries may catch broadly only to record/fail/recover explicitly.
-
-### E-05 No untracked long-lived tasks
-Every task has supervision, health, startup, and shutdown semantics.
-
-### E-06 Performance cannot weaken correctness
-No validator/provenance/risk control is disabled to hit a latency target.
+# Invariants
+
+These requirements govern retained functionality and future Prompt 2 work.
+Requirements for fills, inventory, rewards, and paper orders are normative
+acceptance criteria; they do not claim those systems already exist.
+
+## Retained data foundation
+
+1. **Exact financial arithmetic.** Prices, quantities, rates, fees, and money use
+   exact representations. Financial paths reject binary-float inputs. Tick and
+   size quantization is explicit, bounded, and directionally specified.
+2. **Immutable raw observations.** Preserve application payload bytes before
+   interpretation. Never rewrite a historical record to repair an interpretation.
+   Payload, segment, and completion hashes must validate before trusted replay.
+3. **Complete provenance.** Derived records retain raw ingest identities, payload
+   hashes, reference versions, source/configuration versions, and run identity.
+   Conflicting identities for one raw source fail closed. Credentials and
+   unrestricted request objects cannot enter raw transport metadata or logs.
+4. **Canonical identity.** Market and token identities bind exact native IDs and
+   their venue. A metadata update creates a new version without changing stable
+   identity. Import renaming cannot silently change stored IDs or hash domains.
+5. **Strict schemas.** Unknown/invalid required fields, duplicate JSON keys,
+   unsupported formats, indeterminate rules, and contradictory references produce
+   explicit typed outcomes. Missing evidence cannot become an affirmative result.
+6. **Deterministic replay.** Verified durable recorded order, as-known-at-time
+   references, exact timestamps, and the declared configuration determine state.
+   Replay performs no fresh network lookups and does not invent missing controls.
+7. **No silent loss.** Sequence gaps, duplicates, queue saturation, rejected
+   records, interruptions, and incomplete output are explicit. A derived output
+   completion claim requires reconciled accepted/processed/rejected evidence.
+8. **Fail-closed state.** Stale, future-relative, inconsistent, crossed,
+   uncertain, or audit-ineligible books cannot support an affirmative admission
+   decision. Recovery must satisfy its own canonical evidence contract.
+9. **Bounded resources.** Queues, message sizes, journal segments/runs,
+   analytical buffers, histories, and diagnostics have enforced limits.
+   Exhaustion records failure instead of dropping evidence or increasing a bound
+   implicitly. Collection setup and measured execution remain distinguishable.
+10. **Full-depth ownership.** Simultaneous logical mutations respect canonical
+    event ordering. Reported BBO cannot overwrite full-depth liquidity. Venue
+    timestamps and opaque hashes cannot substitute for project-owned exact-state
+    comparison or a proven REST/WebSocket ordering relation.
+11. **YES/NO semantics.** Complementarity requires verified ordinary YES and NO
+    tokens in the same condition, with explicit payout asset and settlement
+    rules. UI similarity and price sums do not prove a settlement relationship.
+
+## Future strategy and paper execution
+
+12. **Optional exposure.** Every decision permits `NO_QUOTE`. A pair is optional;
+    no rule requires symmetric quoting or participation in an ineligible market.
+13. **Conservative fills.** Unknown queue position remains uncertainty. Touching
+    a quote does not establish a fill. Partial fills, latency, queue-ahead,
+    cancel-in-flight exposure, and uncertain responses remain explicit.
+14. **Versioned economics.** Fees, liquidity rewards, and maker rebates are
+    separate, dated rule sets with validated source provenance. Unknown costs or
+    qualification cannot be credited as realized income. Estimated rewards and
+    actual reconciled payouts remain distinct.
+15. **Accurate accounting.** Every fill reconciles cash, fees, token inventory,
+    outstanding orders, and reserved exposure. Spread capture, paired settlement,
+    mark-to-market, and liquidation proceeds cannot double-count the same value.
+    Resolution and unresolved terminal inventory use declared valuation rules.
+16. **Atomic exposure reservation.** Outstanding orders and uncertain responses
+    consume inventory/capital capacity. The same capacity cannot fund concurrent
+    quotes twice. Cancel requests release exposure only on sufficient evidence.
+17. **No automatic live transition.** Paper actions cannot invoke a signer or
+    live-order transport. A future live-capable task requires explicit user
+    authorization, authoritative eligibility verification, and separate
+    acceptance. Historical/paper P&L does not grant that authorization.
+
+Validation must preserve negative findings and unavailable evidence.
+Migration checks, strategy tests, and empirical acceptance remain separate under
+[VALIDATION_GATES.md](VALIDATION_GATES.md).
