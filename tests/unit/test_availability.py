@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from multi_market_arbitrage.core.ids import CollectorRunId
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.core.ids import CollectorRunId
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.observability import (
     AVAILABILITY_INTERVAL_SCHEMA_VERSION,
     AvailabilityCause,
     AvailabilityInterval,

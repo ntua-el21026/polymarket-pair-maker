@@ -14,23 +14,23 @@ from typing import Literal, cast
 import httpx
 import pytest
 
-from multi_market_arbitrage.core.config import load_phase1_config
-from multi_market_arbitrage.core.ids import CollectorRunId, ConnectionId, SubscriptionId, WriterId
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import (
+from polymarket_pair_maker.core.config import load_phase1_config
+from polymarket_pair_maker.core.ids import CollectorRunId, ConnectionId, SubscriptionId, WriterId
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import (
     JournalReader,
     JournalReceipt,
     JournalTicket,
     JournalWriterConfig,
     RawJournalWriter,
 )
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.observability import (
     AvailabilityCause,
     AvailabilityScope,
     InMemoryMetrics,
 )
-from multi_market_arbitrage.pipeline import (
+from polymarket_pair_maker.pipeline import (
     CLOB_MARKET_PREFIX,
     CONTROL_BOOK_INVALIDATION,
     CONTROL_REPORTED_TOP_TRANSITION_EXPIRED,
@@ -54,19 +54,19 @@ from multi_market_arbitrage.pipeline import (
     ReportedTopTransitionStatus,
     WebSocketAdmissionWatermark,
 )
-from multi_market_arbitrage.pipeline import observe as observe_module
-from multi_market_arbitrage.pipeline.audit import AuditTriggerReason
-from multi_market_arbitrage.pipeline.health import ObservationRuntimeHealth
-from multi_market_arbitrage.pipeline.ingress import (
+from polymarket_pair_maker.pipeline import observe as observe_module
+from polymarket_pair_maker.pipeline.audit import AuditTriggerReason
+from polymarket_pair_maker.pipeline.health import ObservationRuntimeHealth
+from polymarket_pair_maker.pipeline.ingress import (
     BoundedRawIngress,
     RawIngressItem,
     drain_websocket_to_ingress,
 )
-from multi_market_arbitrage.pipeline.observe import PolymarketObservationService
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID
-from multi_market_arbitrage.replay import replay_journal
-from multi_market_arbitrage.state import InvalidationReason
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.pipeline.observe import PolymarketObservationService
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID
+from polymarket_pair_maker.replay import replay_journal
+from polymarket_pair_maker.state import InvalidationReason
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketEndpointClass,
     PolymarketPublicClient,
     PolymarketWebSocketFailureCategory,
@@ -75,7 +75,7 @@ from multi_market_arbitrage.venues.polymarket import (
     PublicReadResult,
     ReceivedWebSocketMessage,
 )
-from multi_market_arbitrage.venues.polymarket.schemas import parse_gamma_markets
+from polymarket_pair_maker.venues.polymarket.schemas import parse_gamma_markets
 
 FIXTURES = Path(__file__).parents[1] / "golden" / "fixtures"
 BACKLOG_MESSAGES = 128
@@ -343,7 +343,7 @@ async def test_pre_response_update_queued_in_ingress_is_inside_audit_fence(
 
             instrument_id = processor.audit_book_identity("token-yes").instrument_id
             hard_expiry_ns = capture.book_freshness_receive_ns_by_instrument[instrument_id] + int(
-                config.scanner.maximum_book_age_seconds * 1_000_000_000
+                config.eligibility.maximum_book_age_seconds * 1_000_000_000
             )
             start, start_result = await service._stage_audit_start(  # pyright: ignore[reportPrivateUsage]
                 capture=capture,
@@ -476,7 +476,7 @@ async def test_response_durable_before_expiry_but_classified_after_expiry_fails_
     config = load_phase1_config(Path("config/phase1.toml"))
     config = config.model_copy(
         update={
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 0.1,
                     "maximum_interleg_skew_seconds": 0.05,
@@ -521,7 +521,7 @@ async def test_response_durable_before_expiry_but_classified_after_expiry_fails_
     await _initialize_books(capture)
     instrument_id = processor.audit_book_identity("token-yes").instrument_id
     hard_expiry_ns = capture.book_freshness_receive_ns_by_instrument[instrument_id] + int(
-        config.scanner.maximum_book_age_seconds * 1_000_000_000
+        config.eligibility.maximum_book_age_seconds * 1_000_000_000
     )
     start, start_result = await service._stage_audit_start(  # pyright: ignore[reportPrivateUsage]
         capture=capture,
@@ -537,8 +537,12 @@ async def test_response_durable_before_expiry_but_classified_after_expiry_fails_
 
     response_ns = time.monotonic_ns()
     assert response_ns < hard_expiry_ns
-    scan_latency_before = metrics.histogram_snapshot("mma_receive_to_scan_complete_ns")
-    scan_latency_sum_before = 0.0 if scan_latency_before is None else scan_latency_before.total_sum
+    eligibility_latency_before = metrics.histogram_snapshot(
+        "ppm_receive_to_eligibility_complete_ns"
+    )
+    eligibility_latency_sum_before = (
+        0.0 if eligibility_latency_before is None else eligibility_latency_before.total_sum
+    )
     response = AuditHttpResponseHandoff(
         request_id=start.request_id,
         connection_id=connection_id,
@@ -597,9 +601,11 @@ async def test_response_durable_before_expiry_but_classified_after_expiry_fails_
     assert tuple(outcome.outcome for outcome in result.audit_outcomes) == (AuditOutcome.FAILED,)
     outcome = result.audit_outcomes[0]
     assert outcome.reason is AuditFailureReason.BOOK_FRESHNESS_EXPIRED
-    scan_latency_after = metrics.histogram_snapshot("mma_receive_to_scan_complete_ns")
-    assert scan_latency_after is not None
-    assert scan_latency_after.total_sum - scan_latency_sum_before >= (hard_expiry_ns - response_ns)
+    eligibility_latency_after = metrics.histogram_snapshot("ppm_receive_to_eligibility_complete_ns")
+    assert eligibility_latency_after is not None
+    assert eligibility_latency_after.total_sum - eligibility_latency_sum_before >= (
+        hard_expiry_ns - response_ns
+    )
     assert outcome.raw_response_sha256 == response.payload_sha256
     live = processor.summary()
     records = JournalReader(tmp_path / "raw", run_id).read_all()
@@ -1457,10 +1463,10 @@ async def test_raced_retry_budget_exhaustion_is_bounded_and_replayable(
     assert live.rest_audit_failed == 1
 
     counters = {key.name: value for key, value in metrics.snapshot().counters}
-    assert counters["mma_rest_audit_retries_total"] == 1
-    assert counters["mma_rest_audit_race_budget_exhaustions_total"] == 1
+    assert counters["ppm_rest_audit_retries_total"] == 1
+    assert counters["ppm_rest_audit_race_budget_exhaustions_total"] == 1
     retry_interval = metrics.histogram_snapshot(
-        "mma_rest_audit_effective_interval_ns",
+        "ppm_rest_audit_effective_interval_ns",
         labels={"trigger": AuditTriggerReason.RACE_RETRY.value},
     )
     assert retry_interval is not None
@@ -1683,8 +1689,8 @@ async def test_four_quiet_race_retries_recover_on_fifth_attempt_without_socket_d
     assert live.rest_audit_failed == 0
     assert live.audit_ineligible_books == 0
     counters = {key.name: value for key, value in metrics.snapshot().counters}
-    assert counters["mma_rest_audit_retries_total"] == 4
-    assert counters.get("mma_rest_audit_race_budget_exhaustions_total", 0) == 0
+    assert counters["ppm_rest_audit_retries_total"] == 4
+    assert counters.get("ppm_rest_audit_race_budget_exhaustions_total", 0) == 0
     records = JournalReader(tmp_path / "raw", run_id).read_all()
     assert sum(record.channel == WS_MARKET for record in records) == 4
     assert sum(record.channel == CONTROL_REST_AUDIT_FAILED for record in records) == 0
@@ -1712,7 +1718,7 @@ async def test_quiet_race_retry_never_crosses_deadline_boundaries(
                     "snapshot_audit_race_retry_quiet_seconds": (0.10 if hard_expiry_case else 0.3),
                 }
             ),
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 0.20 if hard_expiry_case else 5.0,
                     "maximum_interleg_skew_seconds": 0.01 if hard_expiry_case else 1.0,
@@ -1907,9 +1913,9 @@ async def test_quiet_race_retry_never_crosses_deadline_boundaries(
     }
     expected_reason = "race_retry_quiet_interval_expired" if hard_expiry_case else "run_deadline"
     expected_metric = (
-        "mma_rest_audit_legs_suppressed_total"
+        "ppm_rest_audit_legs_suppressed_total"
         if hard_expiry_case
-        else "mma_rest_audit_retries_suppressed_total"
+        else "ppm_rest_audit_retries_suppressed_total"
     )
     assert labeled_counters[(expected_metric, expected_reason)] == 1
     replayed = replay_journal(tmp_path / "raw", run_id, config).processor
@@ -2099,12 +2105,12 @@ async def test_raced_audit_does_not_retry_after_protocol_resync_is_pending(
     assert live.parse_failures == 0
     assert runtime_health.snapshot().protocol_deviations == 0
     counters = {key.name: value for key, value in metrics.snapshot().counters}
-    assert counters.get("mma_rest_audit_retries_total", 0) == 0
+    assert counters.get("ppm_rest_audit_retries_total", 0) == 0
     labeled_counters = {
         (key.name, dict(key.labels).get("reason")): value
         for key, value in metrics.snapshot().counters
     }
-    assert labeled_counters[("mma_rest_audit_retries_suppressed_total", "generation_exit")] == 1
+    assert labeled_counters[("ppm_rest_audit_retries_suppressed_total", "generation_exit")] == 1
 
     records = JournalReader(tmp_path / "raw", run_id).read_all()
     assert sum(record.channel == CONTROL_REST_AUDIT_START for record in records) == 2
@@ -2307,7 +2313,7 @@ async def test_second_start_crossing_leg_expiry_closes_all_staged_legs_without_h
             "polymarket": config.polymarket.model_copy(
                 update={"snapshot_audit_interval_seconds": 30.0}
             ),
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 0.2,
                     "maximum_interleg_skew_seconds": 0.1,
@@ -2702,7 +2708,7 @@ async def test_concurrent_first_legs_complete_before_selected_refresh_exit(
     assert tuple(outcome.outcome for outcome in live.audit_outcomes) == expected_audit_outcomes
     assert live.pending_rest_audits == 0
     assert live.terminal_hash == replayed.terminal_hash
-    assert counters.get("mma_rest_audit_legs_suppressed_total", 0) == 0
+    assert counters.get("ppm_rest_audit_legs_suppressed_total", 0) == 0
     assert sum(record.channel == CONTROL_REST_AUDIT_START for record in records) == 2
     assert sum(record.channel == REST_BOOK_AUDIT for record in records) == 2
 
@@ -2960,9 +2966,9 @@ async def test_websocket_disconnect_during_active_audit_fails_generation_and_onl
     assert health.reconnects == 0
 
     counters = {key.name: value for key, value in metrics.snapshot().counters}
-    assert counters["mma_websocket_disconnects_total"] == 1
-    assert counters.get("mma_websocket_reconnects_total", 0) == 0
-    assert counters.get("mma_polymarket_http_final_failures_total", 0) == 0
+    assert counters["ppm_websocket_disconnects_total"] == 1
+    assert counters.get("ppm_websocket_reconnects_total", 0) == 0
+    assert counters.get("ppm_polymarket_http_final_failures_total", 0) == 0
     records = JournalReader(tmp_path / "raw", run_id).read_all()
     assert sum(record.channel == CONTROL_REST_AUDIT_START for record in records) == 2
     # Both first attempts begin only after both starts are durable, so the
@@ -3103,7 +3109,7 @@ async def test_response_after_socket_end_fails_both_staged_legs_closed(
     )
     assert live.pending_rest_audits == 0
     assert live.terminal_hash == replayed.terminal_hash
-    assert counters.get("mma_rest_audit_legs_suppressed_total", 0) == 0
+    assert counters.get("ppm_rest_audit_legs_suppressed_total", 0) == 0
     assert sum(record.channel == CONTROL_REST_AUDIT_START for record in records) == 2
     assert sum(record.channel == REST_BOOK_AUDIT for record in records) == 1
     assert sum(record.channel == CONTROL_REST_AUDIT_CLASSIFY for record in records) == 1
@@ -3489,7 +3495,7 @@ async def test_idle_books_launch_guarded_audit_before_future_periodic_deadline(
                     "snapshot_audit_freshness_guard_seconds": 0.3,
                 }
             ),
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 0.4,
                     "maximum_interleg_skew_seconds": 0.1,
@@ -3574,7 +3580,7 @@ async def test_idle_books_launch_guarded_audit_before_future_periodic_deadline(
     monkeypatch.setattr(observe_module, "PolymarketMarketWebSocket", _IdleSocket)
     await writer.start()
     await _initialize_books(capture)
-    maximum_book_age_ns = int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    maximum_book_age_ns = int(config.eligibility.maximum_book_age_seconds * 1_000_000_000)
     hard_expiry_ns_by_asset = {
         asset_id: capture.book_freshness_receive_ns_by_instrument[
             processor.audit_book_identity(asset_id).instrument_id
@@ -3631,23 +3637,23 @@ async def test_idle_books_launch_guarded_audit_before_future_periodic_deadline(
     assert live.pending_rest_audits == 0
     trigger_labels = {"trigger": AuditTriggerReason.FRESHNESS_GUARD.value}
     assert (
-        metrics.counter_value("mma_rest_audit_starts_by_trigger_total", labels=trigger_labels) == 2
+        metrics.counter_value("ppm_rest_audit_starts_by_trigger_total", labels=trigger_labels) == 2
     )
     assert (
         metrics.counter_value(
-            "mma_rest_audit_outcomes_by_trigger_total",
+            "ppm_rest_audit_outcomes_by_trigger_total",
             labels={**trigger_labels, "outcome": AuditOutcome.MATCH.value},
         )
         == 2
     )
     http_latency = metrics.histogram_snapshot(
-        "mma_rest_audit_http_latency_ns",
+        "ppm_rest_audit_http_latency_ns",
         labels=trigger_labels,
     )
     assert http_latency is not None
     assert http_latency.total_count == 2
     freshness_budget = metrics.histogram_snapshot(
-        "mma_rest_audit_remaining_freshness_budget_ns",
+        "ppm_rest_audit_remaining_freshness_budget_ns",
         labels=trigger_labels,
     )
     assert freshness_budget is not None
@@ -3778,7 +3784,7 @@ async def test_run_deadline_after_durable_audit_start_closes_without_http(
             "polymarket": config.polymarket.model_copy(
                 update={"snapshot_audit_freshness_guard_seconds": 0.4}
             ),
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 1.0,
                     "maximum_interleg_skew_seconds": 0.1,
@@ -3921,7 +3927,7 @@ async def test_run_deadline_after_durable_audit_start_closes_without_http(
     assert live.audit_outcomes[0].reason is AuditFailureReason.RUN_ENDED
     assert live.pending_rest_audits == 0
     assert live.terminal_hash == replayed.terminal_hash
-    assert counters[("mma_rest_audit_launches_suppressed_total", "run_deadline_after_stage")] == 1
+    assert counters[("ppm_rest_audit_launches_suppressed_total", "run_deadline_after_stage")] == 1
     assert sum(record.channel == CONTROL_REST_AUDIT_START for record in records) == 1
     assert sum(record.channel == CONTROL_REST_AUDIT_FAILED for record in records) == 1
     assert sum(record.channel == REST_BOOK_AUDIT for record in records) == 0
@@ -3940,7 +3946,7 @@ async def test_public_controller_deadline_wins_run_end_without_duplicate_failure
             "polymarket": config.polymarket.model_copy(
                 update={"snapshot_audit_freshness_guard_seconds": 0.025}
             ),
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 0.03,
                     "maximum_interleg_skew_seconds": 0.01,

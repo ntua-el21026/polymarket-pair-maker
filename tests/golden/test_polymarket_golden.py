@@ -3,12 +3,12 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from multi_market_arbitrage.core.ids import CanonicalEventId, IngestId
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.normalization import NormalizationContext, PolymarketNormalizer
-from multi_market_arbitrage.reference import PolymarketReferenceBuilder, ReferenceBundle
-from multi_market_arbitrage.state import CanonicalL2BookOwner
-from multi_market_arbitrage.venues.polymarket.schemas import (
+from polymarket_pair_maker.core.ids import CanonicalEventId, IngestId
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.normalization import NormalizationContext, PolymarketNormalizer
+from polymarket_pair_maker.reference import PolymarketReferenceBuilder, ReferenceBundle
+from polymarket_pair_maker.state import CanonicalL2BookOwner
+from polymarket_pair_maker.venues.polymarket.schemas import (
     parse_clob_market_info,
     parse_gamma_markets,
     parse_rest_book,

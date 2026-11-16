@@ -10,9 +10,9 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.config import Phase1Config, load_phase1_config
-from multi_market_arbitrage.core.exact import ExactDecimal, Price, Quantity
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.config import Phase1Config, load_phase1_config
+from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -20,11 +20,11 @@ from multi_market_arbitrage.core.ids import (
     MarketId,
     SubscriptionId,
 )
-from multi_market_arbitrage.core.provenance import RawSourceRef
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import JournalMetricsSnapshot
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.core.provenance import RawSourceRef
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import JournalMetricsSnapshot
+from polymarket_pair_maker.observability import (
     AvailabilityCause,
     AvailabilityEvidenceRuntimeSnapshot,
     AvailabilityRecoveryOutcome,
@@ -36,8 +36,8 @@ from multi_market_arbitrage.observability import (
     SupervisedAvailabilityIntervalWriter,
     normalize_git_commit,
 )
-from multi_market_arbitrage.pipeline import health as health_module
-from multi_market_arbitrage.pipeline.audit import (
+from polymarket_pair_maker.pipeline import health as health_module
+from polymarket_pair_maker.pipeline.audit import (
     AuditBookIdentity,
     AuditDivergenceResolution,
     AuditFailureReason,
@@ -48,12 +48,12 @@ from multi_market_arbitrage.pipeline.audit import (
     AuditTriggerReason,
     build_audit_mismatch_diagnostic,
 )
-from multi_market_arbitrage.pipeline.channels import (
+from polymarket_pair_maker.pipeline.channels import (
     CLOB_MARKET_PREFIX,
     GAMMA_MARKETS_KEYSET,
     REST_BOOK,
 )
-from multi_market_arbitrage.pipeline.health import (
+from polymarket_pair_maker.pipeline.health import (
     AvailabilityInterruption,
     ObservationRuntimeHealth,
     ObservationRuntimeHealthSnapshot,
@@ -62,18 +62,18 @@ from multi_market_arbitrage.pipeline.health import (
     SupervisedProcessResourceSampler,
     build_observation_health_checkpoint,
 )
-from multi_market_arbitrage.pipeline.ingress import BoundedRawIngress
-from multi_market_arbitrage.pipeline.processor import CanonicalProcessor, ProcessorSummary
-from multi_market_arbitrage.pipeline.targeting import (
+from polymarket_pair_maker.pipeline.ingress import BoundedRawIngress
+from polymarket_pair_maker.pipeline.processor import CanonicalProcessor, ProcessorSummary
+from polymarket_pair_maker.pipeline.targeting import (
     ObservationTargetMode,
     ResolvedPolymarketTarget,
 )
-from multi_market_arbitrage.pipeline.transitions import ReportedTopTransition
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID
-from multi_market_arbitrage.research import AnalyticalRuntimeSnapshot
-from multi_market_arbitrage.state import BookLevel, ImmutableOrderBookSnapshot
-from multi_market_arbitrage.venues.polymarket import ReceivedWebSocketMessage
-from multi_market_arbitrage.venues.polymarket.public_reads import PublicReadMetricsSnapshot
+from polymarket_pair_maker.pipeline.transitions import ReportedTopTransition
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID
+from polymarket_pair_maker.research import AnalyticalRuntimeSnapshot
+from polymarket_pair_maker.state import BookLevel, ImmutableOrderBookSnapshot
+from polymarket_pair_maker.venues.polymarket import ReceivedWebSocketMessage
+from polymarket_pair_maker.venues.polymarket.public_reads import PublicReadMetricsSnapshot
 
 FIXTURES = Path(__file__).parents[1] / "golden" / "fixtures"
 
@@ -395,7 +395,7 @@ def _checkpoint(
     source_root: str | None = "/workspace",
     repository_root: str | None = "/workspace",
     repository_head_commit: str | None = "a" * 40,
-    imported_package_root: str | None = "/workspace/src/multi_market_arbitrage",
+    imported_package_root: str | None = "/workspace/src/polymarket_pair_maker",
     source_binding_valid: bool | None = True,
     tracked_source_clean: bool | None = True,
     untracked_source_clean: bool | None = True,
@@ -830,7 +830,7 @@ def test_checkpoint_book_freshness_accepts_exact_bound_and_scopes_selected_targe
             audit_ineligible_instruments=(unrelated_instrument,),
         ),
     )
-    maximum_age_ns = int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    maximum_age_ns = int(config.eligibility.maximum_book_age_seconds * 1_000_000_000)
     received_monotonic_ns = 10_000
 
     checkpoint = _checkpoint(
@@ -1289,7 +1289,7 @@ def test_checkpoint_book_freshness_fails_one_nanosecond_over_bound() -> None:
     config = load_phase1_config(Path("config/phase1.toml"))
     updated_at = UtcTimestamp(1_800_000_000_000_000_000)
     processor, target = _healthy_target_processor(config, updated_at=updated_at)
-    maximum_age_ns = int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    maximum_age_ns = int(config.eligibility.maximum_book_age_seconds * 1_000_000_000)
     received_monotonic_ns = 10_000
 
     checkpoint = _checkpoint(

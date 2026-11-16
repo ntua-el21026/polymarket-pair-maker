@@ -42,7 +42,7 @@ jobs:
       - name: Dependency vulnerability audit
         shell: bash
         run: |
-          audit_dir="${RUNNER_TEMP}/mma-pip-audit"
+          audit_dir="${RUNNER_TEMP}/ppm-pip-audit"
           mkdir -p "${audit_dir}/cache"
           uv export \
             --frozen \

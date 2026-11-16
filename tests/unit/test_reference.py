@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from multi_market_arbitrage.core.exact import ExactDecimal, Money, Price, Quantity
-from multi_market_arbitrage.core.health import MarketStatus
-from multi_market_arbitrage.core.ids import AssetId
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.reference import (
+from polymarket_pair_maker.core.exact import ExactDecimal, Money, Price, Quantity
+from polymarket_pair_maker.core.health import MarketStatus
+from polymarket_pair_maker.core.ids import AssetId
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.reference import (
     POLYMARKET_PUSD_ASSET_ID,
     CostContext,
     CostStatus,
@@ -16,8 +16,8 @@ from multi_market_arbitrage.reference import (
     ReferenceRegistry,
     ReferenceStatus,
 )
-from multi_market_arbitrage.semantic import ProofStatus, prove_binary_complement
-from multi_market_arbitrage.venues.polymarket.schemas import (
+from polymarket_pair_maker.semantic import ProofStatus, prove_binary_complement
+from polymarket_pair_maker.venues.polymarket.schemas import (
     ClobMarketInfo,
     FeeScheduleSchema,
     GammaMarket,

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from multi_market_arbitrage.core.config import load_phase1_config
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.config import load_phase1_config
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -17,9 +17,9 @@ from multi_market_arbitrage.core.ids import (
     VenueId,
     WriterId,
 )
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import (
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import (
     DEFAULT_MAX_UNCOMPRESSED_RUN_BYTES,
     JournalCorruptionError,
     JournalReader,
@@ -29,16 +29,16 @@ from multi_market_arbitrage.journal import (
     completion_path_for_run,
     load_run_completion_head,
 )
-from multi_market_arbitrage.journal import reader as reader_module
-from multi_market_arbitrage.journal.reader import run_key_for
-from multi_market_arbitrage.pipeline import (
+from polymarket_pair_maker.journal import reader as reader_module
+from polymarket_pair_maker.journal.reader import run_key_for
+from polymarket_pair_maker.pipeline import (
     CONTROL_BOOK_INVALIDATION,
     CanonicalProcessor,
     ProcessedEnvelope,
 )
-from multi_market_arbitrage.replay import engine as replay_engine
-from multi_market_arbitrage.replay import replay_journal
-from multi_market_arbitrage.research import validate_data
+from polymarket_pair_maker.replay import engine as replay_engine
+from polymarket_pair_maker.replay import replay_journal
+from polymarket_pair_maker.research import validate_data
 
 
 def _envelope(

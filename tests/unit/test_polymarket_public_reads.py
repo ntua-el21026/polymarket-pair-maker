@@ -12,7 +12,7 @@ import httpx
 import pytest
 import websockets
 
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketEndpointClass,
     PolymarketHttpFailureCategory,
     PolymarketHttpProtocolError,
@@ -1035,7 +1035,7 @@ async def test_websocket_transport_and_protocol_failures_are_distinct(
         return _FailingWebSocketContext(failure)
 
     monkeypatch.setattr(
-        "multi_market_arbitrage.venues.polymarket.client.websockets.connect",
+        "polymarket_pair_maker.venues.polymarket.client.websockets.connect",
         connect,
     )
     socket = PolymarketMarketWebSocket(("yes", "no"))
@@ -1109,7 +1109,7 @@ async def test_websockets_17_recv_close_codes_have_reachable_taxonomy(
         return _ClosingWebSocketContext(socket_fixture)
 
     monkeypatch.setattr(
-        "multi_market_arbitrage.venues.polymarket.client.websockets.connect",
+        "polymarket_pair_maker.venues.polymarket.client.websockets.connect",
         connect,
     )
     market_socket = PolymarketMarketWebSocket(("yes", "no"))

@@ -5,8 +5,8 @@ from dataclasses import replace
 
 import pytest
 
-from multi_market_arbitrage.core.exact import Price, Quantity
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.exact import Price, Quantity
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -14,10 +14,10 @@ from multi_market_arbitrage.core.ids import (
     SubscriptionId,
     VenueId,
 )
-from multi_market_arbitrage.core.serialization import canonical_json_bytes
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.pipeline.audit import (
+from polymarket_pair_maker.core.serialization import canonical_json_bytes
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.pipeline.audit import (
     AuditBookIdentity,
     AuditClassificationCommand,
     AuditMismatchCause,
@@ -25,14 +25,14 @@ from multi_market_arbitrage.pipeline.audit import (
     WebSocketAdmissionWatermark,
     compare_audit_exact_depth,
 )
-from multi_market_arbitrage.pipeline.channels import (
+from polymarket_pair_maker.pipeline.channels import (
     CONTROL_REST_AUDIT_CLASSIFY,
     CONTROL_REST_AUDIT_START,
     REST_BOOK,
     REST_BOOK_AUDIT,
     WS_MARKET,
 )
-from multi_market_arbitrage.research.audit_mismatch import (
+from polymarket_pair_maker.research.audit_mismatch import (
     AUDIT_MISMATCH_LINEAGE_REPORT_SCHEMA,
     AuditEqualityProof,
     AuditMatchingStateRepresentation,
@@ -46,7 +46,7 @@ from multi_market_arbitrage.research.audit_mismatch import (
     AuditVenueStateRelation,
     build_audit_mismatch_lineage_report,
 )
-from multi_market_arbitrage.state.order_books.models import BookLevel
+from polymarket_pair_maker.state.order_books.models import BookLevel
 
 _RUN = CollectorRunId("audit-mismatch-v2-run")
 _PRIMARY_CONNECTION = ConnectionId("audit-mismatch-v2-primary")

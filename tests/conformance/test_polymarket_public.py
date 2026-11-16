@@ -9,8 +9,8 @@ from typing import cast
 import httpx
 import pytest
 
-from multi_market_arbitrage.core.exact import ExactDecimal, Quantity
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.core.exact import ExactDecimal, Quantity
+from polymarket_pair_maker.venues.polymarket import (
     POLYMARKET_CAPABILITIES,
     PolymarketMarketWebSocket,
     PolymarketPublicClient,
@@ -25,7 +25,7 @@ from multi_market_arbitrage.venues.polymarket import (
     parse_market_ws_message,
     parse_rest_book,
 )
-from multi_market_arbitrage.venues.polymarket.schemas import (
+from polymarket_pair_maker.venues.polymarket.schemas import (
     WsBookEvent,
     WsNewMarketEvent,
     WsPriceChangeEvent,
@@ -383,7 +383,7 @@ async def test_market_subscription_passes_explicit_limits_to_websocket(
         return _SocketContext(socket)
 
     monkeypatch.setattr(
-        "multi_market_arbitrage.venues.polymarket.client.websockets.connect",
+        "polymarket_pair_maker.venues.polymarket.client.websockets.connect",
         fake_connect,
     )
     stream = PolymarketMarketWebSocket(

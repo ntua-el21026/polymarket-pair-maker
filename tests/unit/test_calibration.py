@@ -12,14 +12,14 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.observability import HistogramSnapshot, MetricKey, MetricsSnapshot
-from multi_market_arbitrage.pipeline.calibration import (
+from polymarket_pair_maker.observability import HistogramSnapshot, MetricKey, MetricsSnapshot
+from polymarket_pair_maker.pipeline.calibration import (
     _counter,  # pyright: ignore[reportPrivateUsage]
     _journal_commit_to_durable_distribution,  # pyright: ignore[reportPrivateUsage]
     _verify_clean_source_checkout,  # pyright: ignore[reportPrivateUsage]
 )
-from multi_market_arbitrage.pipeline.observe import ObservationSummary
-from multi_market_arbitrage.research import (
+from polymarket_pair_maker.pipeline.observe import ObservationSummary
+from polymarket_pair_maker.research import (
     STDIO_STREAM_LOG_STORAGE_MODEL,
     CalibrationDecisionReason,
     CalibrationDistribution,
@@ -75,7 +75,7 @@ def _measurements() -> CalibrationMeasurements:
         durable_raw_records=1_010,
         uncompressed_raw_bytes=2_000_000,
         canonical_events=800,
-        scans_by_disposition=(("NO_APPARENT_EDGE", 400), ("VALIDATED", 20)),
+        eligibility_assessments_by_disposition=(("BLOCKED", 20), ("ELIGIBLE", 400)),
         journal_durability_groups=510,
         journal_data_fsyncs=510,
         journal_group_size=CalibrationDistribution(
@@ -199,14 +199,14 @@ def test_calibration_source_binding_requires_exact_clean_checkout(tmp_path: Path
 def test_calibration_audit_retries_use_only_the_typed_audit_counter() -> None:
     metrics = MetricsSnapshot(
         counters=(
-            (MetricKey("mma_polymarket_http_retries_total"), 9.0),
-            (MetricKey("mma_rest_audit_retries_total"), 2.0),
+            (MetricKey("ppm_polymarket_http_retries_total"), 9.0),
+            (MetricKey("ppm_rest_audit_retries_total"), 2.0),
         ),
         gauges=(),
         histograms=(),
     )
 
-    assert _counter(metrics, "mma_rest_audit_retries_total") == 2
+    assert _counter(metrics, "ppm_rest_audit_retries_total") == 2
 
 
 def test_calibration_binds_production_commit_to_durable_distribution() -> None:
@@ -226,7 +226,7 @@ def test_calibration_binds_production_commit_to_durable_distribution() -> None:
             observability_metrics=MetricsSnapshot(
                 counters=(),
                 gauges=(),
-                histograms=((MetricKey("mma_journal_commit_to_durable_ns"), expected),),
+                histograms=((MetricKey("ppm_journal_commit_to_durable_ns"), expected),),
             )
         ),
     )
@@ -263,7 +263,7 @@ def test_calibration_binds_health_bounds_and_stdio_stream_log_model() -> None:
     measurement_record = report.measurements.to_record()
     limits_record = report.limits.to_record()
     queue_record = report.measurements.queues[0].to_record()
-    assert report.schema_version == "phase1-pre-soak-calibration-v2"
+    assert report.schema_version == "ppm-pre-soak-calibration-v1"
     assert measurement_record["log_bytes"] == 0
     assert measurement_record["log_storage_model"] == STDIO_STREAM_LOG_STORAGE_MODEL
     assert measurement_record["journal_commit_to_durable"] == {
@@ -426,7 +426,7 @@ def test_calibration_cli_forwards_exact_target_duration_and_fresh_output(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    cli = importlib.import_module("multi_market_arbitrage.cli.main")
+    cli = importlib.import_module("polymarket_pair_maker.cli.main")
     observed: dict[str, object] = {}
 
     async def fake_run(**kwargs: object) -> object:

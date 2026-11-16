@@ -14,12 +14,12 @@ from typing import ClassVar, cast
 
 import pytest
 
-from multi_market_arbitrage.core.config import load_phase1_config
-from multi_market_arbitrage.core.health import ComponentHealth
-from multi_market_arbitrage.core.ids import ConnectionId, SubscriptionId
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.journal import JournalReader
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.core.config import load_phase1_config
+from polymarket_pair_maker.core.health import ComponentHealth
+from polymarket_pair_maker.core.ids import ConnectionId, SubscriptionId
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.journal import JournalReader
+from polymarket_pair_maker.observability import (
     AvailabilityCause,
     AvailabilityRecoveryAction,
     AvailabilityRecoveryOutcome,
@@ -27,9 +27,9 @@ from multi_market_arbitrage.observability import (
     HealthDecisionReason,
     SupervisedAvailabilityIntervalWriter,
 )
-from multi_market_arbitrage.observability.availability import AvailabilityInterval
-from multi_market_arbitrage.pipeline import observe as observe_module
-from multi_market_arbitrage.pipeline.channels import (
+from polymarket_pair_maker.observability.availability import AvailabilityInterval
+from polymarket_pair_maker.pipeline import observe as observe_module
+from polymarket_pair_maker.pipeline.channels import (
     CLOB_MARKET_PREFIX,
     CONTROL_REST_AUDIT_REPLACEMENT_RELEASE,
     CONTROL_REST_AUDIT_START,
@@ -38,15 +38,15 @@ from multi_market_arbitrage.pipeline.channels import (
     REST_BOOK_AUDIT,
     WS_MARKET,
 )
-from multi_market_arbitrage.pipeline.ingress import RawIngressItem
-from multi_market_arbitrage.pipeline.observe import PolymarketObservationService
-from multi_market_arbitrage.pipeline.processor import ProcessedEnvelope
-from multi_market_arbitrage.pipeline.targeting import (
+from polymarket_pair_maker.pipeline.ingress import RawIngressItem
+from polymarket_pair_maker.pipeline.observe import PolymarketObservationService
+from polymarket_pair_maker.pipeline.processor import ProcessedEnvelope
+from polymarket_pair_maker.pipeline.targeting import (
     ObservationTargetMode,
     ResolvedPolymarketTarget,
 )
-from multi_market_arbitrage.replay import replay_journal
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.replay import replay_journal
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketEndpointClass,
     PolymarketHttpFailureCategory,
     PolymarketHttpTransportError,
@@ -55,7 +55,7 @@ from multi_market_arbitrage.venues.polymarket import (
     PublicReadResult,
     ReceivedWebSocketMessage,
 )
-from multi_market_arbitrage.venues.polymarket.schemas import parse_gamma_markets
+from polymarket_pair_maker.venues.polymarket.schemas import parse_gamma_markets
 
 FIXTURES = Path(__file__).parents[1] / "golden" / "fixtures"
 
@@ -176,7 +176,7 @@ def _initialize_clean_source(repository: Path) -> str:
     _git(repository, "init", "--quiet")
     source_marker = repository / ".source-fixture"
     source_marker.write_text("clean source\n", encoding="utf-8")
-    package_marker = repository / "src" / "multi_market_arbitrage" / "__init__.py"
+    package_marker = repository / "src" / "polymarket_pair_maker" / "__init__.py"
     package_marker.parent.mkdir(parents=True)
     package_marker.write_text("# test-owned imported package root\n", encoding="utf-8")
     _git(
@@ -204,8 +204,8 @@ def bind_imported_source_to_test_repository(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    host_module = importlib.import_module("multi_market_arbitrage.observability.host")
-    imported_package_root = tmp_path / "src" / "multi_market_arbitrage"
+    host_module = importlib.import_module("polymarket_pair_maker.observability.host")
+    imported_package_root = tmp_path / "src" / "polymarket_pair_maker"
     monkeypatch.setattr(
         host_module,
         "_imported_package_root",
@@ -462,10 +462,10 @@ def _configured_service(
                     "snapshot_audit_race_retry_quiet_seconds": 0.005,
                 }
             ),
-            "scanner": (
-                config.scanner
+            "eligibility": (
+                config.eligibility
                 if maximum_book_age_seconds is None
-                else config.scanner.model_copy(
+                else config.eligibility.model_copy(
                     update={
                         "maximum_book_age_seconds": maximum_book_age_seconds,
                         "maximum_interleg_skew_seconds": min(
@@ -563,7 +563,7 @@ async def test_observed_divergence_resnapshot_replacement_generation_restores_cu
             recovery_states.append(
                 (
                     native_asset_id,
-                    result.scan_count,
+                    result.eligibility_count,
                     tuple(
                         instrument.value
                         for instrument in capture.processor.audit_ineligible_instruments
@@ -606,7 +606,7 @@ async def test_observed_divergence_resnapshot_replacement_generation_restores_cu
                 replacement_states.append(
                     (
                         native_asset_id,
-                        result.scan_count,
+                        result.eligibility_count,
                         tuple(
                             instrument.value
                             for instrument in capture.processor.audit_ineligible_instruments
@@ -710,7 +710,7 @@ async def test_observed_divergence_resnapshot_replacement_generation_restores_cu
     }
     assert (
         suppressed_launches[
-            ("mma_rest_audit_launches_suppressed_total", "divergence_recovery_pending")
+            ("ppm_rest_audit_launches_suppressed_total", "divergence_recovery_pending")
         ]
         >= 2
     )
@@ -787,7 +787,7 @@ async def test_sibling_reported_top_blocks_release_until_authoritative_reconcili
     original_preserve_websocket = (
         observe_module._RawCaptureBoundary.preserve_websocket_batch  # pyright: ignore[reportPrivateUsage]
     )
-    overlap_scan_counts: list[int] = []
+    overlap_eligibility_counts: list[int] = []
 
     async def observe_sibling_overlap(
         capture: observe_module._RawCaptureBoundary,  # pyright: ignore[reportPrivateUsage]
@@ -837,7 +837,7 @@ async def test_sibling_reported_top_blocks_release_until_authoritative_reconcili
                     assert first_processed is not None
                     first_processed.set()
                 if event_type == "best_bid_ask":
-                    overlap_scan_counts.append(result.scan_count)
+                    overlap_eligibility_counts.append(result.eligibility_count)
                     assert capture.processor.audit_replacement_captures_pending == 1
                     assert capture.processor.reported_top_transitions
                     assert not capture.processor.audit_replacement_release_commands(
@@ -860,7 +860,7 @@ async def test_sibling_reported_top_blocks_release_until_authoritative_reconcili
 
     summary = await service.run(duration_seconds=0.7, gamma_market_id="101")
 
-    assert overlap_scan_counts == [0]
+    assert overlap_eligibility_counts == [0]
     assert summary.processor.audit_replacement_captures_pending == 0
     assert summary.processor.audit_ineligible_books == 0
     assert summary.health_decision.research_eligible
@@ -1016,7 +1016,7 @@ async def test_stale_first_replacement_snapshot_cannot_close_recovery_interval(
 
 
 @pytest.mark.asyncio
-async def test_slow_canonical_return_cannot_scan_or_release_stale_replacement_capture(
+async def test_slow_canonical_return_cannot_admit_or_release_stale_replacement_capture(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1029,7 +1029,7 @@ async def test_slow_canonical_return_cannot_scan_or_release_stale_replacement_ca
     original_preserve_websocket = (
         observe_module._RawCaptureBoundary.preserve_websocket_batch  # pyright: ignore[reportPrivateUsage]
     )
-    replacement_scan_counts: list[int] = []
+    replacement_eligibility_counts: list[int] = []
     processed_replacement_assets: list[str] = []
 
     async def delay_completed_replacement_batch(
@@ -1056,7 +1056,7 @@ async def test_slow_canonical_return_cannot_scan_or_release_stale_replacement_ca
                 native_asset_id = raw.get("asset_id")
                 assert isinstance(native_asset_id, str)
                 processed_replacement_assets.append(native_asset_id)
-                replacement_scan_counts.append(result.scan_count)
+                replacement_eligibility_counts.append(result.eligibility_count)
                 if native_asset_id == "token-yes":
                     first_processed = _LifecycleSocket.first_replacement_processed
                     assert first_processed is not None
@@ -1066,7 +1066,7 @@ async def test_slow_canonical_return_cannot_scan_or_release_stale_replacement_ca
         if delay_return:
             # Both raw snapshots are mutually fresh and already canonical, but
             # the coordinator cannot see their result until after the hard age
-            # bound.  No scanner/research release may occur in that gap.
+            # bound.  No data admission/research release may occur in that gap.
             await asyncio.sleep(maximum_book_age_seconds + 0.04)
         return results
 
@@ -1079,7 +1079,7 @@ async def test_slow_canonical_return_cannot_scan_or_release_stale_replacement_ca
     summary = await service.run(duration_seconds=0.8, gamma_market_id="101")
 
     assert processed_replacement_assets == ["token-yes", "token-no"]
-    assert replacement_scan_counts == [0, 0]
+    assert replacement_eligibility_counts == [0, 0]
     assert summary.processor.audit_divergences_observed == 1
     assert summary.processor.audit_divergences_resolved_by_authoritative_resnapshot == 1
     assert summary.processor.audit_divergences_pending == 0
@@ -1117,7 +1117,7 @@ async def test_ended_replacement_generation_cannot_release_after_canonical_retur
     original_preserve_websocket = (
         observe_module._RawCaptureBoundary.preserve_websocket_batch  # pyright: ignore[reportPrivateUsage]
     )
-    replacement_scan_counts: list[int] = []
+    replacement_eligibility_counts: list[int] = []
     processed_replacement_assets: list[str] = []
     canonical_return_monotonic_ns: list[int] = []
 
@@ -1144,7 +1144,7 @@ async def test_ended_replacement_generation_cannot_release_after_canonical_retur
                 native_asset_id = raw.get("asset_id")
                 assert isinstance(native_asset_id, str)
                 processed_replacement_assets.append(native_asset_id)
-                replacement_scan_counts.append(result.scan_count)
+                replacement_eligibility_counts.append(result.eligibility_count)
                 if native_asset_id == "token-yes":
                     first_processed = _LifecycleSocket.first_replacement_processed
                     assert first_processed is not None
@@ -1168,7 +1168,7 @@ async def test_ended_replacement_generation_cannot_release_after_canonical_retur
     summary = await service.run(duration_seconds=0.8, gamma_market_id="101")
 
     assert processed_replacement_assets == ["token-yes", "token-no"]
-    assert replacement_scan_counts == [0, 0]
+    assert replacement_eligibility_counts == [0, 0]
     assert len(canonical_return_monotonic_ns) == 1
     replacement_ended_ns = _LifecycleSocket.replacement_ended_monotonic_ns
     assert replacement_ended_ns is not None

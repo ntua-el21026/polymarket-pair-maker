@@ -5,10 +5,9 @@ from typing import cast
 import pytest
 from pydantic import ValidationError
 
-from multi_market_arbitrage.cli import main as cli_main
-from multi_market_arbitrage.core.config import Phase1Config, Phase1RuntimeRole, load_config
-from multi_market_arbitrage.core.errors import ConfigurationFault
-from multi_market_arbitrage.core.exact import ExactDecimal
+from polymarket_pair_maker.cli import main as cli_main
+from polymarket_pair_maker.core.config import Phase1Config, Phase1RuntimeRole, load_config
+from polymarket_pair_maker.core.errors import ConfigurationFault
 
 _CONFIG_PATH = Path("config/phase1.toml")
 
@@ -24,7 +23,7 @@ def _section(raw: dict[str, object], name: str) -> dict[str, object]:
 def test_committed_phase1_configuration_loads_strictly() -> None:
     config = load_config(_CONFIG_PATH)
     assert config.system.runtime_role is Phase1RuntimeRole.OBSERVE
-    assert config.scanner.quantity_increment == ExactDecimal.parse("0.01")
+    assert config.eligibility.enabled is True
     assert config.logging.json_output is True
     assert config.polymarket.maximum_http_response_bytes == 8 * 1024 * 1024
     assert config.polymarket.maximum_websocket_message_bytes == 1024 * 1024
@@ -34,7 +33,7 @@ def test_committed_phase1_configuration_loads_strictly() -> None:
     assert config.polymarket.public_reads.maximum_attempts == 3
     assert config.polymarket.public_reads.gamma_markets_requests_per_window == 30
     assert config.polymarket.public_reads.rate_limit_checked_on.isoformat() == "2026-08-22"
-    assert config.scanner.maximum_capacity_evaluations == 4096
+    assert config.eligibility.maximum_book_age_seconds == 5.0
     assert config.health.checkpoint_interval_seconds == 10.0
     assert config.health.availability_queue_capacity == 64
     assert config.health.maximum_availability_intervals == 8192
@@ -105,11 +104,11 @@ def test_public_endpoint_validation_rejects_insecure_or_secret_urls(field: str, 
         Phase1Config.from_mapping(raw)
 
 
-def test_threshold_and_timing_cross_field_validation() -> None:
+def test_obsolete_economic_keys_and_timing_cross_field_validation() -> None:
     raw = _raw_config()
-    scanner = _section(raw, "scanner")
-    scanner["minimum_edge_thresholds"] = ["0.01", "0.005"]
-    raw["scanner"] = scanner
+    eligibility = _section(raw, "eligibility")
+    eligibility["minimum_edge_thresholds"] = ["0.01", "0.005"]
+    raw["eligibility"] = eligibility
     with pytest.raises(ValidationError):
         Phase1Config.from_mapping(raw)
 

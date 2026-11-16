@@ -4,7 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from multi_market_arbitrage.core.exact import (
+from polymarket_pair_maker.core.exact import (
     ExactDecimal,
     InexactDivisionError,
     RoundingMode,

@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.ids import (
     CanonicalEventId,
     CollectorRunId,
     ConfigHash,
@@ -16,13 +16,13 @@ from multi_market_arbitrage.core.ids import (
     VenueId,
     deterministic_sha256,
 )
-from multi_market_arbitrage.core.provenance import Provenance
-from multi_market_arbitrage.core.serialization import (
+from polymarket_pair_maker.core.provenance import Provenance
+from polymarket_pair_maker.core.serialization import (
     CanonicalSerializationError,
     canonical_json_bytes,
     canonical_sha256,
 )
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
 
 
 def test_stable_ids_are_runtime_and_static_distinct_types() -> None:

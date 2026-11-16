@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from multi_market_arbitrage.core.config import Phase1Config, load_phase1_config
-from multi_market_arbitrage.core.exact import Price, Quantity
-from multi_market_arbitrage.core.health import BookHealth
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.config import Phase1Config, load_phase1_config
+from polymarket_pair_maker.core.exact import Price, Quantity
+from polymarket_pair_maker.core.health import BookHealth
+from polymarket_pair_maker.core.ids import (
     CanonicalEventId,
     CollectorRunId,
     ConnectionId,
@@ -22,17 +22,18 @@ from multi_market_arbitrage.core.ids import (
     SchemaVersion,
     SubscriptionId,
 )
-from multi_market_arbitrage.core.serialization import canonical_json_bytes, canonical_sha256
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.normalization import (
+from polymarket_pair_maker.core.serialization import canonical_json_bytes, canonical_sha256
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.market_data import EligibilityDisposition
+from polymarket_pair_maker.normalization import (
     BookSide,
     CanonicalEvent,
     CanonicalEventType,
     PriceChangeEvent,
     PriceLevelChange,
 )
-from multi_market_arbitrage.pipeline import (
+from polymarket_pair_maker.pipeline import (
     CLOB_MARKET_PREFIX,
     CONTROL_REPORTED_TOP_TRANSITION_EXPIRED,
     CONTROL_REST_AUDIT_START,
@@ -52,8 +53,8 @@ from multi_market_arbitrage.pipeline import (
     ReportedTopTransitionStatus,
     WebSocketAdmissionWatermark,
 )
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID
-from multi_market_arbitrage.state.order_books import (
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID
+from polymarket_pair_maker.state.order_books import (
     BookStateError,
     CanonicalL2BookOwner,
     InvalidationReason,
@@ -572,7 +573,7 @@ def _bootstrap_catch_up_case(
         ordinal=1,
     )
     assert processor.process_replayed(snapshot).success
-    maximum_book_age_ns = int(effective_config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    maximum_book_age_ns = int(effective_config.eligibility.maximum_book_age_seconds * 1_000_000_000)
     if case.snapshot_to_target_ns > maximum_book_age_ns:
         assert case.ingest_seq == 57885
         _refresh_seq57885_freshness_with_matching_audits(
@@ -680,7 +681,7 @@ def _assert_pending_transition_is_fail_closed(
     summary = processor.summary()
     assert summary.pending_reported_top_transitions >= 1
     assert summary.audit_ineligible_books >= 1
-    assert summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.BLOCKED
     return transition
 
 
@@ -1697,7 +1698,7 @@ def test_stale_gap_incremental_invalidates_but_authoritative_ws_snapshot_recover
         no_top=("0.983", "0.986"),
         config=config,
     )
-    gap_monotonic_ns = 100 + int(config.scanner.maximum_book_age_seconds * 1_000_000_000) + 1
+    gap_monotonic_ns = 100 + int(config.eligibility.maximum_book_age_seconds * 1_000_000_000) + 1
     stale_delta = _envelope(
         run_id,
         3,
@@ -2025,7 +2026,7 @@ def test_remove_old_level_before_add_new_level_stays_pending_then_converges() ->
     assert summary.parse_failures == 0
     assert summary.pending_reported_top_transitions == 0
     assert summary.reported_top_transitions_converged == 1
-    assert summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.ELIGIBLE
     outcome = summary.reported_top_transition_outcomes[-1]
     assert outcome.transition_id == started.transition_id
     assert outcome.accepted_frame_count == 3
@@ -2188,7 +2189,7 @@ def test_repeated_same_target_then_complete_exact_top_supersedes_successfully() 
     assert summary.parse_failures == 0
     assert summary.pending_reported_top_transitions == 0
     assert summary.reported_top_transitions_superseded == 1
-    assert summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.ELIGIBLE
     outcome = summary.reported_top_transition_outcomes[-1]
     assert outcome.transition_id == started.transition_id
     assert outcome.accepted_frame_count == 3
@@ -2226,7 +2227,7 @@ def test_irrelevant_last_trade_does_not_advance_or_clear_pending_transition() ->
     assert result.success
     assert not result.needs_resync
     assert result.canonical_event_count == 1
-    assert result.scan_count == 0
+    assert result.eligibility_count == 0
     pending = _assert_pending_transition_is_fail_closed(processor, YES_ASSET_ID)
     assert pending == started
     assert pending.accepted_frame_count == 1
@@ -2251,7 +2252,7 @@ def test_disconnect_closes_typed_then_new_generation_authoritative_snapshot_reco
     assert disconnected_summary.healthy_books == 0
     assert disconnected_summary.pending_reported_top_transitions == 0
     assert disconnected_summary.reported_top_transitions_invalidated == 1
-    assert disconnected_summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.BLOCKED
     assert all(owner.snapshot().health is BookHealth.INVALID for owner in processor.owners)
     disconnect_outcome = disconnected_summary.reported_top_transition_outcomes[-1]
     assert disconnect_outcome.transition == started
@@ -2287,7 +2288,7 @@ def test_disconnect_closes_typed_then_new_generation_authoritative_snapshot_reco
     assert summary.healthy_books == 2
     assert summary.pending_reported_top_transitions == 0
     assert summary.reported_top_transition_outcomes == (disconnect_outcome,)
-    assert summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.ELIGIBLE
 
 
 def test_invalid_quantity_while_pending_fails_closed_with_deterministic_outcome() -> None:
@@ -2322,7 +2323,7 @@ def test_invalid_quantity_while_pending_fails_closed_with_deterministic_outcome(
     assert summary.healthy_books == 0
     assert summary.pending_reported_top_transitions == 0
     assert summary.reported_top_transitions_invalidated == 1
-    assert summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.BLOCKED
     assert all(owner.snapshot().health is BookHealth.INVALID for owner in processor.owners)
     outcome = summary.reported_top_transition_outcomes[-1]
     assert outcome.transition == started
@@ -2374,7 +2375,7 @@ def test_conflicting_raw_provenance_while_pending_invalidates_typed_without_pars
     assert summary.parse_failures == 0
     assert summary.pending_reported_top_transitions == 0
     assert summary.reported_top_transitions_invalidated == 1
-    assert summary.validated_opportunities == 0
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.BLOCKED
     outcome = summary.reported_top_transition_outcomes[-1]
     assert outcome.transition == started
     assert outcome.status is ReportedTopTransitionStatus.INVALIDATED

@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from multi_market_arbitrage.observability import capture_host_runtime_identity
-from multi_market_arbitrage.pipeline.health import capture_process_resources
+from polymarket_pair_maker.observability import capture_host_runtime_identity
+from polymarket_pair_maker.pipeline.health import capture_process_resources
 
 
 def _git(repository: Path, *arguments: str) -> str:
@@ -29,7 +29,7 @@ def _git(repository: Path, *arguments: str) -> str:
 
 def _initialize_repository(repository: Path) -> tuple[str, Path, Path]:
     _git(repository, "init", "--quiet")
-    package_root = repository / "src" / "multi_market_arbitrage"
+    package_root = repository / "src" / "polymarket_pair_maker"
     package_root.mkdir(parents=True)
     (package_root / "__init__.py").write_text("# fixture\n", encoding="utf-8")
     tracked = repository / "tracked.txt"
@@ -56,7 +56,7 @@ def test_host_runtime_identity_binds_code_config_lock_and_runtime(
     tmp_path: Path,
 ) -> None:
     commit, package_root, _tracked = _initialize_repository(tmp_path)
-    host_module: Any = importlib.import_module("multi_market_arbitrage.observability.host")
+    host_module: Any = importlib.import_module("polymarket_pair_maker.observability.host")
     monkeypatch.setattr(host_module, "_imported_package_root", lambda: str(package_root))
 
     identity = capture_host_runtime_identity(
@@ -100,7 +100,7 @@ def test_source_identity_distinguishes_clean_tracked_and_untracked_state(
     repository = tmp_path / "repository"
     repository.mkdir()
     commit, package_root, tracked = _initialize_repository(repository)
-    host_module: Any = importlib.import_module("multi_market_arbitrage.observability.host")
+    host_module: Any = importlib.import_module("polymarket_pair_maker.observability.host")
     monkeypatch.setattr(host_module, "_imported_package_root", lambda: str(package_root))
 
     clean = capture_host_runtime_identity(
@@ -138,7 +138,7 @@ def test_source_identity_distinguishes_clean_tracked_and_untracked_state(
     assert escaped_package.source_identity_mismatch is True
 
     ignored_package_root = (
-        repository / ".venv" / "lib" / "python" / "site-packages" / "multi_market_arbitrage"
+        repository / ".venv" / "lib" / "python" / "site-packages" / "polymarket_pair_maker"
     )
     ignored_package_root.mkdir(parents=True)
     monkeypatch.setattr(
@@ -197,7 +197,7 @@ def test_missing_host_fields_are_explicit_unknown(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    host_module: Any = importlib.import_module("multi_market_arbitrage.observability.host")
+    host_module: Any = importlib.import_module("polymarket_pair_maker.observability.host")
     monkeypatch.setattr(host_module, "_uv_identity", lambda: None)
     monkeypatch.setattr(host_module, "_cpu_model", lambda: None)
     monkeypatch.setattr(host_module, "_total_memory_bytes", lambda: None)

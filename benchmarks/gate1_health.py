@@ -22,22 +22,22 @@ from typing import cast
 REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY / "src"))
 
-from multi_market_arbitrage.core.config import load_phase1_config  # noqa: E402
-from multi_market_arbitrage.core.ids import (  # noqa: E402
+from polymarket_pair_maker.core.config import load_phase1_config  # noqa: E402
+from polymarket_pair_maker.core.ids import (  # noqa: E402
     CollectorRunId,
     ConnectionId,
     IngestId,
     InstrumentId,
     SubscriptionId,
 )
-from multi_market_arbitrage.core.serialization import canonical_json_bytes  # noqa: E402
-from multi_market_arbitrage.core.time import (  # noqa: E402
+from polymarket_pair_maker.core.serialization import canonical_json_bytes  # noqa: E402
+from polymarket_pair_maker.core.time import (  # noqa: E402
     MonotonicTimestamp,
     UtcTimestamp,
 )
-from multi_market_arbitrage.ingestion import RawEventEnvelope  # noqa: E402
-from multi_market_arbitrage.journal import JournalMetricsSnapshot  # noqa: E402
-from multi_market_arbitrage.observability import (  # noqa: E402
+from polymarket_pair_maker.ingestion import RawEventEnvelope  # noqa: E402
+from polymarket_pair_maker.journal import JournalMetricsSnapshot  # noqa: E402
+from polymarket_pair_maker.observability import (  # noqa: E402
     AvailabilityCause,
     AvailabilityEvidenceRuntimeSnapshot,
     AvailabilityInterval,
@@ -52,26 +52,26 @@ from multi_market_arbitrage.observability import (  # noqa: E402
     SupervisedAvailabilityIntervalWriter,
     SupervisedHealthCheckpointWriter,
 )
-from multi_market_arbitrage.pipeline import (  # noqa: E402
+from polymarket_pair_maker.pipeline import (  # noqa: E402
     CLOB_MARKET_PREFIX,
     GAMMA_MARKETS_KEYSET,
     REST_BOOK,
     CanonicalProcessor,
 )
-from multi_market_arbitrage.pipeline.health import (  # noqa: E402
+from polymarket_pair_maker.pipeline.health import (  # noqa: E402
     ObservationRuntimeHealthSnapshot,
     ProcessResourceSnapshot,
     ProcessResourceTrendSnapshot,
     build_observation_health_checkpoint,
 )
-from multi_market_arbitrage.pipeline.ingress import RawIngressMetricsSnapshot  # noqa: E402
-from multi_market_arbitrage.pipeline.targeting import resolve_polymarket_target  # noqa: E402
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID  # noqa: E402
-from multi_market_arbitrage.research import (  # noqa: E402
+from polymarket_pair_maker.pipeline.ingress import RawIngressMetricsSnapshot  # noqa: E402
+from polymarket_pair_maker.pipeline.targeting import resolve_polymarket_target  # noqa: E402
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID  # noqa: E402
+from polymarket_pair_maker.research import (  # noqa: E402
     AnalyticalQueueSnapshot,
     AnalyticalRuntimeSnapshot,
 )
-from multi_market_arbitrage.venues.polymarket import (  # noqa: E402
+from polymarket_pair_maker.venues.polymarket import (  # noqa: E402
     PolymarketEndpointClass,
     PublicReadEndpointMetricsSnapshot,
     PublicReadMetricsSnapshot,
@@ -274,7 +274,7 @@ def _production_checkpoint_builder(
             for domain, high_water in (
                 ("reference", 1),
                 ("canonical_events", 3),
-                ("complete_set_scans", 2),
+                ("book_eligibility", 2),
             )
         ),
         failure_type=None,
@@ -326,9 +326,9 @@ def _production_checkpoint_builder(
         active_attempts_high_water=1,
     )
     metrics = InMemoryMetrics()
-    for scanner_ns, t_obs_ns in ((25_000, 100_000), (50_000, 250_000), (75_000, 500_000)):
-        metrics.observe_histogram("mma_scanner_latency_ns", scanner_ns)
-        metrics.observe_histogram("mma_receive_to_scan_complete_ns", t_obs_ns)
+    for eligibility_ns, t_obs_ns in ((25_000, 100_000), (50_000, 250_000), (75_000, 500_000)):
+        metrics.observe_histogram("ppm_eligibility_evaluator_latency_ns", eligibility_ns)
+        metrics.observe_histogram("ppm_receive_to_eligibility_complete_ns", t_obs_ns)
     resources = ProcessResourceSnapshot(
         sampled_monotonic_ns=5_000_000_000,
         free_disk_bytes=100 * 1024 * 1024 * 1024,
@@ -378,7 +378,7 @@ def _production_checkpoint_builder(
         source_root="/workspace",
         repository_root="/workspace",
         repository_head_commit=git_commit,
-        imported_package_root="/workspace/src/multi_market_arbitrage",
+        imported_package_root="/workspace/src/polymarket_pair_maker",
         code_commit_matches_repository=True,
         source_binding_valid=True,
         tracked_source_clean=True,
@@ -726,7 +726,7 @@ async def _run(output: Path) -> dict[str, object]:
         for cadence in CADENCES_SECONDS
     ]
     source_status = _command("git", "status", "--short")
-    uv_executable = os.environ.get("MMA_BENCHMARK_UV", "uv")
+    uv_executable = os.environ.get("PPM_BENCHMARK_UV", "uv")
     return {
         "schema_version": SCHEMA_VERSION,
         "identity": {

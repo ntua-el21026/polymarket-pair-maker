@@ -16,17 +16,17 @@ from unittest.mock import Mock
 
 import pytest
 
-from multi_market_arbitrage.core.config import Phase1Config, load_phase1_config
-from multi_market_arbitrage.core.health import ComponentHealth
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.config import Phase1Config, load_phase1_config
+from polymarket_pair_maker.core.health import ComponentHealth
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     InstrumentId,
     SubscriptionId,
 )
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.journal import JournalBackpressureError, RawJournalWriter
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.journal import JournalBackpressureError, RawJournalWriter
+from polymarket_pair_maker.observability import (
     AVAILABILITY_EVIDENCE_SUMMARY_VERSION,
     HEALTH_EVIDENCE_SUMMARY_VERSION,
     AvailabilityCause,
@@ -35,23 +35,23 @@ from multi_market_arbitrage.observability import (
     HealthDecisionReason,
     HealthEvidenceSummary,
 )
-from multi_market_arbitrage.pipeline import health as health_module
-from multi_market_arbitrage.pipeline import observe as observe_module
-from multi_market_arbitrage.pipeline.channels import (
+from polymarket_pair_maker.pipeline import health as health_module
+from polymarket_pair_maker.pipeline import observe as observe_module
+from polymarket_pair_maker.pipeline.channels import (
     CLOB_MARKET_PREFIX,
     GAMMA_MARKETS_KEYSET,
     REST_BOOK,
 )
-from multi_market_arbitrage.pipeline.health import ObservationRuntimeHealth
-from multi_market_arbitrage.pipeline.ingress import BoundedRawIngress, RawIngressBackpressureError
-from multi_market_arbitrage.pipeline.observe import PolymarketObservationService
-from multi_market_arbitrage.pipeline.targeting import (
+from polymarket_pair_maker.pipeline.health import ObservationRuntimeHealth
+from polymarket_pair_maker.pipeline.ingress import BoundedRawIngress, RawIngressBackpressureError
+from polymarket_pair_maker.pipeline.observe import PolymarketObservationService
+from polymarket_pair_maker.pipeline.targeting import (
     ObservationTargetMode,
     ResolvedPolymarketTarget,
 )
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID
-from multi_market_arbitrage.research import ResearchOutputSummary, SupervisedAnalyticalOutputs
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID
+from polymarket_pair_maker.research import ResearchOutputSummary, SupervisedAnalyticalOutputs
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketPublicClient,
     PolymarketWebSocketFailureCategory,
     PolymarketWebSocketProtocolError,
@@ -60,7 +60,7 @@ from multi_market_arbitrage.venues.polymarket import (
     PublicReadPolicy,
     ReceivedWebSocketMessage,
 )
-from multi_market_arbitrage.venues.polymarket.schemas import parse_gamma_markets
+from polymarket_pair_maker.venues.polymarket.schemas import parse_gamma_markets
 
 FIXTURES = Path(__file__).parents[1] / "golden" / "fixtures"
 
@@ -388,8 +388,8 @@ def bind_imported_source_to_test_repository(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    host_module = importlib.import_module("multi_market_arbitrage.observability.host")
-    imported_package_root = tmp_path / "src" / "multi_market_arbitrage"
+    host_module = importlib.import_module("polymarket_pair_maker.observability.host")
+    imported_package_root = tmp_path / "src" / "polymarket_pair_maker"
     monkeypatch.setattr(
         host_module,
         "_imported_package_root",
@@ -416,7 +416,7 @@ def _initialize_clean_source(repository: Path) -> str:
     _git(repository, "init", "--quiet")
     marker = repository / ".source-fixture"
     marker.write_text("clean source\n", encoding="utf-8")
-    package_marker = repository / "src" / "multi_market_arbitrage" / "__init__.py"
+    package_marker = repository / "src" / "polymarket_pair_maker" / "__init__.py"
     package_marker.parent.mkdir(parents=True)
     package_marker.write_text("# test-owned imported package root\n", encoding="utf-8")
     _git(
@@ -580,7 +580,7 @@ def test_terminal_protocol_history_does_not_reblock_recovered_current_state() ->
         root=Path("analytical"),
         reference_manifest_hashes=(),
         canonical_manifest_hashes=(),
-        scan_manifest_hashes=(),
+        eligibility_manifest_hashes=(),
     )
     recovered = HealthDecision(
         capture_healthy=True,
@@ -763,7 +763,7 @@ def test_post_checkpoint_audit_blockers_fail_closed_at_terminal(
         root=Path("analytical"),
         reference_manifest_hashes=(),
         canonical_manifest_hashes=(),
-        scan_manifest_hashes=(),
+        eligibility_manifest_hashes=(),
     )
     stale_periodic_decision = HealthDecision(
         capture_healthy=True,
@@ -1626,7 +1626,7 @@ async def test_terminal_health_uses_paired_capture_cutoff_before_audit_drain(
     config, _ = _configured_service(tmp_path)
     config = config.model_copy(
         update={
-            "scanner": config.scanner.model_copy(
+            "eligibility": config.eligibility.model_copy(
                 update={
                     "maximum_book_age_seconds": 0.03,
                     "maximum_interleg_skew_seconds": 0.01,

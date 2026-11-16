@@ -6,13 +6,13 @@ from types import TracebackType
 
 import pytest
 
-from multi_market_arbitrage.core.ids import ConnectionId
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.pipeline.ingress import (
+from polymarket_pair_maker.core.ids import ConnectionId
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.pipeline.ingress import (
     BoundedRawIngress,
     RawIngressBackpressureError,
 )
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketMarketWebSocket,
     ReceivedWebSocketMessage,
 )
@@ -65,7 +65,7 @@ async def test_socket_owner_stamps_and_admits_before_downstream_consumes(
         return _SocketContext(socket)
 
     monkeypatch.setattr(
-        "multi_market_arbitrage.venues.polymarket.client.websockets.connect",
+        "polymarket_pair_maker.venues.polymarket.client.websockets.connect",
         fake_connect,
     )
     connection_id = ConnectionId("ingress-watermark-test")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from multi_market_arbitrage.pipeline.freshness import (
+from polymarket_pair_maker.pipeline.freshness import (
     IntegrityDeadlineReason,
     next_integrity_deadline,
 )

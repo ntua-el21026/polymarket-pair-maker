@@ -18,9 +18,9 @@ from pathlib import Path
 REPOSITORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY / "src"))
 
-from multi_market_arbitrage.core.config import Phase1Config, load_phase1_config  # noqa: E402
-from multi_market_arbitrage.core.serialization import canonical_json_bytes  # noqa: E402
-from multi_market_arbitrage.venues.polymarket import (  # noqa: E402
+from polymarket_pair_maker.core.config import Phase1Config, load_phase1_config  # noqa: E402
+from polymarket_pair_maker.core.serialization import canonical_json_bytes  # noqa: E402
+from polymarket_pair_maker.venues.polymarket import (  # noqa: E402
     PolymarketPublicClient,
     PublicReadPolicy,
     parse_rest_book,

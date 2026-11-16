@@ -7,16 +7,16 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
     SubscriptionId,
     VenueId,
 )
-from multi_market_arbitrage.core.serialization import canonical_json_bytes
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEnvelopeValidationError, RawEventEnvelope
+from polymarket_pair_maker.core.serialization import canonical_json_bytes
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEnvelopeValidationError, RawEventEnvelope
 
 
 def make_envelope(

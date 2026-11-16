@@ -9,11 +9,11 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from multi_market_arbitrage.core.exact import ExactDecimal, Price, Quantity
-from multi_market_arbitrage.core.health import BookHealth
-from multi_market_arbitrage.core.ids import IngestId
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.normalization import (
+from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity
+from polymarket_pair_maker.core.health import BookHealth
+from polymarket_pair_maker.core.ids import IngestId
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.normalization import (
     POLYMARKET_NORMALIZER_VERSION,
     POLYMARKET_SCHEMA_VERSION,
     BestBidAskEvent,
@@ -25,19 +25,19 @@ from multi_market_arbitrage.normalization import (
     OrderBookSnapshotEvent,
     PolymarketNormalizer,
 )
-from multi_market_arbitrage.reference import (
+from polymarket_pair_maker.reference import (
     PolymarketReferenceBuilder,
     ReferenceBundle,
 )
-from multi_market_arbitrage.state import (
+from polymarket_pair_maker.state import (
     BookMutationKind,
     BookStateError,
     CanonicalL2BookOwner,
     InvalidationReason,
     RestAuditStatus,
 )
-from multi_market_arbitrage.venues.polymarket import PolymarketSchemaError
-from multi_market_arbitrage.venues.polymarket.schemas import (
+from polymarket_pair_maker.venues.polymarket import PolymarketSchemaError
+from polymarket_pair_maker.venues.polymarket.schemas import (
     WsBestBidAskEvent,
     parse_clob_market_info,
     parse_gamma_markets,
@@ -723,7 +723,7 @@ def test_last_trade_is_recorded_without_refreshing_l2_freshness() -> None:
     after = owner.snapshot()
 
     assert mutation.kinds == BookMutationKind.LAST_TRADE_DIAGNOSTIC
-    assert not mutation.scanner_dirty
+    assert not mutation.eligibility_dirty
     assert after.last_trade_price == Price.parse("0.46")
     assert after.last_valid_update_time == before.last_valid_update_time
     assert after.last_source_event_id == before.last_source_event_id

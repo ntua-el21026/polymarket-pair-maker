@@ -1,0 +1,82 @@
+{
+  "schema_version": "ppm-migration-fixture-integrity-v1",
+  "original_commit": "3ece7fe5ebb2aa94ae4993847d69661620b551c4",
+  "description": "Original fourteen fixtures remain byte-preserved; compatibility fixture generated from original source before rename.",
+  "original_fixtures": [
+    {
+      "path": "tests/golden/fixtures/gate1/corpus-metadata.json",
+      "sha256": "2e6ea4acb480f389d2fc3da67bd85acb2506489ea120f187485eaf56e1cac018",
+      "bytes": 13855
+    },
+    {
+      "path": "tests/golden/fixtures/gate1/primary-20066-price-change.json.b64",
+      "sha256": "bd35a2d365ff91ea9a2ee6bca41a05e87962cad80d80cfca1cb457bbd6a2ec2f",
+      "bytes": 837
+    },
+    {
+      "path": "tests/golden/fixtures/gate1/primary-26146-price-change.json.b64",
+      "sha256": "7c2ed8b99f0019c1b35a629ec5995a34e8e4961f575aa9122ec08e04684978ad",
+      "bytes": 825
+    },
+    {
+      "path": "tests/golden/fixtures/gate1/primary-57885-price-change.json.b64",
+      "sha256": "c97caa286906bcd7593c48f2c9e1f7f2329b2c805983b8e01eefc1be22911a06",
+      "bytes": 825
+    },
+    {
+      "path": "tests/golden/fixtures/gate1/primary-84229-price-change.json.b64",
+      "sha256": "32100e3797353409f181f9a1df2951acb0554db93600f22f017708a5b52b8a5c",
+      "bytes": 837
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_clob_market_info.json",
+      "sha256": "e453f4ebb71bd4ac47271ed448bbbbceba1862b77c256c509fbc8333bac6bf3d",
+      "bytes": 266
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_gamma_market_keyset.json",
+      "sha256": "c13bf5c965e78c3fcd9f4746ab63de09eedb9ace79c5f913338ceff2a8152fbe",
+      "bytes": 1061
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_rest_book_yes.json",
+      "sha256": "4925f1de87fd07834e19ff6a6a7f0c04dacceed7379c9bef9eda398597aaf81e",
+      "bytes": 419
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_ws_initial_book.json",
+      "sha256": "fd8facdfdf1275e9f066374211e5685c781ac451158cf6bd9f111d825fc2d151",
+      "bytes": 323
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_ws_last_trade.json",
+      "sha256": "127e4bc5507b1c510f5f05cbb904dcaa4f643b69f18093b477f41a6ccf0262c9",
+      "bytes": 240
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_ws_malformed.json",
+      "sha256": "8c4a92a4061a98e26d7c4e37bf826ba7978a3a5ecef76e4fca6333a03ec526f9",
+      "bytes": 241
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_ws_market_resolved.json",
+      "sha256": "19b0ce873597693cc76a84cead0aa70c7a28a7ea8ce0fa01f41fbb4d140c0499",
+      "bytes": 218
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_ws_price_change.json",
+      "sha256": "bcce768e5e589d4b7f4638e8fdbdcad7bc200ae5c91a945d1e6392149b849ae5",
+      "bytes": 510
+    },
+    {
+      "path": "tests/golden/fixtures/polymarket_ws_tick_change.json",
+      "sha256": "e76a5c4216fbe2ae6b53e3e71fdcd4c23407ad68e66396ba74a3d9aab50ab639",
+      "bytes": 180
+    }
+  ],
+  "compatibility_fixture": {
+    "path": "tests/golden/fixtures/historical_raw_envelope_v1.json",
+    "bytes": 787,
+    "sha256": "9ab91e2a73e0ea3a855c9287250bfde20f261a2f980909023b55005bbe7c6f0f"
+  }
+}

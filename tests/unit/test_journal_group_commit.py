@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -16,9 +16,9 @@ from multi_market_arbitrage.core.ids import (
     VenueId,
     WriterId,
 )
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import (
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import (
     JournalBackpressureError,
     JournalConfigurationError,
     JournalDurabilityState,
@@ -126,7 +126,7 @@ async def test_each_concurrent_admission_has_its_own_bounded_timeout(
                 raise TimeoutError("bounded admission fsync test gate timed out")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", gated_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", gated_fsync)
     await writer.start()
     first_ticket = await writer.enqueue(envelope(run, 0))
     assert await asyncio.to_thread(entered.wait, 2)
@@ -172,7 +172,7 @@ async def test_no_ticket_completes_before_covering_fsync_and_group_shares_tail_w
                 raise TimeoutError("data fsync test gate timed out")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", gated_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", gated_fsync)
     await writer.start()
     tickets = [await writer.enqueue(envelope(run, sequence)) for sequence in range(4)]
     assert await asyncio.to_thread(entered.wait, 2)
@@ -300,7 +300,7 @@ async def test_later_subgroup_fsync_failure_preserves_prior_receipts_and_waterma
                 raise OSError("injected second subgroup fsync failure")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", fail_second_partial_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", fail_second_partial_fsync)
     await writer.start()
     tickets = [await writer.enqueue(envelope(run, sequence)) for sequence in range(4)]
     first_receipts = await asyncio.gather(tickets[0].wait_durable(), tickets[1].wait_durable())
@@ -429,7 +429,7 @@ async def test_cancelled_close_waiter_does_not_cancel_queue_drain_or_seal(
                 raise TimeoutError("close cancellation fsync test gate timed out")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", gated_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", gated_fsync)
     await writer.start()
     first_ticket = await writer.enqueue(envelope(run, 0))
     assert await asyncio.to_thread(entered.wait, 2)
@@ -477,7 +477,7 @@ async def test_worker_failure_while_close_waits_for_slot_does_not_strand_stop_to
             raise OSError("injected failure while close waits")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", failing_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", failing_fsync)
     await writer.start()
     first_ticket = await writer.enqueue(envelope(run, 0))
     assert await asyncio.to_thread(entered.wait, 2)
@@ -571,7 +571,7 @@ async def test_clean_segment_seal_does_not_repeat_partial_file_fsync(
             partial_fsyncs += 1
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", counting_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", counting_fsync)
     await writer.start()
     receipt = await writer.submit(envelope(run, 0))
     assert receipt.state is JournalDurabilityState.DURABLE

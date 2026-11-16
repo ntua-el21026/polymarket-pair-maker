@@ -24,23 +24,23 @@ FIXTURES = REPOSITORY / "tests" / "golden" / "fixtures"
 GATE1_FIXTURES = FIXTURES / "gate1"
 sys.path.insert(0, str(REPOSITORY / "src"))
 
-from multi_market_arbitrage.core.config import (  # noqa: E402
+from polymarket_pair_maker.core.config import (  # noqa: E402
     Phase1Config,
     load_phase1_config,
 )
-from multi_market_arbitrage.core.ids import (  # noqa: E402
+from polymarket_pair_maker.core.ids import (  # noqa: E402
     CollectorRunId,
     ConnectionId,
     IngestId,
     SubscriptionId,
 )
-from multi_market_arbitrage.core.serialization import canonical_sha256  # noqa: E402
-from multi_market_arbitrage.core.time import (  # noqa: E402
+from polymarket_pair_maker.core.serialization import canonical_sha256  # noqa: E402
+from polymarket_pair_maker.core.time import (  # noqa: E402
     MonotonicTimestamp,
     UtcTimestamp,
 )
-from multi_market_arbitrage.ingestion import RawEventEnvelope  # noqa: E402
-from multi_market_arbitrage.pipeline import (  # noqa: E402
+from polymarket_pair_maker.ingestion import RawEventEnvelope  # noqa: E402
+from polymarket_pair_maker.pipeline import (  # noqa: E402
     CLOB_MARKET_PREFIX,
     GAMMA_MARKETS_KEYSET,
     WS_MARKET,
@@ -50,9 +50,9 @@ from multi_market_arbitrage.pipeline import (  # noqa: E402
     ReportedTopTransitionReason,
     ReportedTopTransitionStatus,
 )
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID  # noqa: E402
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID  # noqa: E402
 
-RESULT_SCHEMA = "mma-gate1-reported-top-benchmark-v1"
+RESULT_SCHEMA = "ppm-reported-top-benchmark-v1"
 WORKLOAD_VERSION = "adr-0053-production-processor-v1"
 DEFAULT_WARMUPS = 10
 DEFAULT_REPETITIONS = 100

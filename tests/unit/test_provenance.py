@@ -1,6 +1,6 @@
 import pytest
 
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.ids import (
     CanonicalEventId,
     ConfigHash,
     IngestId,
@@ -9,7 +9,7 @@ from multi_market_arbitrage.core.ids import (
     SchemaVersion,
     VenueId,
 )
-from multi_market_arbitrage.core.provenance import (
+from polymarket_pair_maker.core.provenance import (
     Provenance,
     RawSourceConflictError,
     RawSourceInvariantError,
@@ -17,9 +17,9 @@ from multi_market_arbitrage.core.provenance import (
     merge_raw_source_refs,
     pair_raw_source_refs,
 )
-from multi_market_arbitrage.core.serialization import canonical_json_string
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.normalization.models import (
+from polymarket_pair_maker.core.serialization import canonical_json_string
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.normalization.models import (
     CanonicalEvent,
     CanonicalEventType,
     NewMarketEvent,

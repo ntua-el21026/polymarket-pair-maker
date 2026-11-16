@@ -7,8 +7,8 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.exact import ExactDecimal, Price, Quantity
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity
+from polymarket_pair_maker.core.ids import (
     CanonicalEventId,
     CollectorRunId,
     IngestId,
@@ -18,14 +18,14 @@ from multi_market_arbitrage.core.ids import (
     SchemaVersion,
     VenueId,
 )
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.normalization import (
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.normalization import (
     BookSide,
     CanonicalEvent,
     CanonicalEventType,
     LastTradePriceEvent,
 )
-from multi_market_arbitrage.research import (
+from polymarket_pair_maker.research import (
     Phase1AnalyticalOutputs,
     ResearchOutputSummary,
     SupervisedAnalyticalOutputs,
@@ -49,7 +49,7 @@ class _FaultingOutputs:
     def append_reference(self, *args: object, **kwargs: object) -> None:
         del args, kwargs
 
-    def append_scan(self, *args: object, **kwargs: object) -> None:
+    def append_eligibility(self, *args: object, **kwargs: object) -> None:
         del args, kwargs
 
     def close(
@@ -154,7 +154,7 @@ async def test_physical_analytical_faults_publish_no_completion(
     monkeypatch: pytest.MonkeyPatch,
     fault: str,
 ) -> None:
-    from multi_market_arbitrage.storage import analytical as analytical_module
+    from polymarket_pair_maker.storage import analytical as analytical_module
 
     def raise_fault(*args: object, **kwargs: object) -> None:
         del args, kwargs

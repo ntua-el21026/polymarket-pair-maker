@@ -33,12 +33,12 @@ sys.path.insert(0, str(REPOSITORY / "src"))
 from benchmarks.gate1_health import (  # noqa: E402
     _production_checkpoint_builder,  # pyright: ignore[reportPrivateUsage]
 )
-from multi_market_arbitrage.core.config import (  # noqa: E402
+from polymarket_pair_maker.core.config import (  # noqa: E402
     Phase1Config,
     load_phase1_config,
 )
-from multi_market_arbitrage.core.exact import ExactDecimal, Price, Quantity  # noqa: E402
-from multi_market_arbitrage.core.ids import (  # noqa: E402
+from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity  # noqa: E402
+from polymarket_pair_maker.core.ids import (  # noqa: E402
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -47,23 +47,23 @@ from multi_market_arbitrage.core.ids import (  # noqa: E402
     SubscriptionId,
     VenueId,
 )
-from multi_market_arbitrage.core.provenance import RawSourceRef  # noqa: E402
-from multi_market_arbitrage.core.serialization import (  # noqa: E402
+from polymarket_pair_maker.core.provenance import RawSourceRef  # noqa: E402
+from polymarket_pair_maker.core.serialization import (  # noqa: E402
     canonical_json_bytes,
     canonical_sha256,
 )
-from multi_market_arbitrage.core.time import (  # noqa: E402
+from polymarket_pair_maker.core.time import (  # noqa: E402
     MonotonicTimestamp,
     UtcTimestamp,
 )
-from multi_market_arbitrage.ingestion import RawEventEnvelope  # noqa: E402
-from multi_market_arbitrage.observability import (  # noqa: E402
+from polymarket_pair_maker.ingestion import RawEventEnvelope  # noqa: E402
+from polymarket_pair_maker.observability import (  # noqa: E402
     HealthCheckpoint,
     HealthDecision,
     HealthDecisionInputs,
     evaluate_health_decision,
 )
-from multi_market_arbitrage.pipeline import (  # noqa: E402
+from polymarket_pair_maker.pipeline import (  # noqa: E402
     CLOB_MARKET_PREFIX,
     CONTROL_REST_AUDIT_CLASSIFY,
     CONTROL_REST_AUDIT_REPLACEMENT_RELEASE,
@@ -86,28 +86,28 @@ from multi_market_arbitrage.pipeline import (  # noqa: E402
     build_audit_mismatch_diagnostic,
     compare_audit_exact_depth,
 )
-from multi_market_arbitrage.pipeline.audit import (  # noqa: E402
+from polymarket_pair_maker.pipeline.audit import (  # noqa: E402
     AuditExactDepthDifference,
     AuditMismatchDiagnostic,
     audit_exact_depth_identity,
 )
-from multi_market_arbitrage.pipeline.health import (  # noqa: E402
+from polymarket_pair_maker.pipeline.health import (  # noqa: E402
     AUDIT_DIVERGENCE_PENDING_REPRESENTATIVE_SCHEMA,
     AUDIT_DIVERGENCE_RESOLUTION_REPRESENTATIVE_SCHEMA,
 )
-from multi_market_arbitrage.pipeline.health import (  # noqa: E402
+from polymarket_pair_maker.pipeline.health import (  # noqa: E402
     MAXIMUM_AUDIT_DIVERGENCE_RESOLUTION_REPRESENTATIVES as MAXIMUM_RESOLUTION_REPRESENTATIVES,
 )
-from multi_market_arbitrage.research import (  # noqa: E402
+from polymarket_pair_maker.research import (  # noqa: E402
     AuditMismatchCausalRelation,
     AuditMismatchLineageReport,
     AuditMismatchObservation,
     build_audit_mismatch_lineage_report,
 )
-from multi_market_arbitrage.state import ImmutableOrderBookSnapshot  # noqa: E402
-from multi_market_arbitrage.state.order_books.models import BookLevel  # noqa: E402
+from polymarket_pair_maker.state import ImmutableOrderBookSnapshot  # noqa: E402
+from polymarket_pair_maker.state.order_books.models import BookLevel  # noqa: E402
 
-RESULT_SCHEMA = "mma-gate1-audit-divergence-benchmark-v1"
+RESULT_SCHEMA = "ppm-audit-divergence-benchmark-v1"
 WORKLOAD_VERSION = "adr-0054-production-paths-v2"
 DEFAULT_WARMUPS = 5
 DEFAULT_REPETITIONS = 30
@@ -810,7 +810,7 @@ def _replacement_snapshot_only_factory(config: Phase1Config) -> OperationFactory
             _require_success(result, label="replacement-snapshot-only operation")
             summary = processor.summary()
             if (
-                result.scan_count != 0
+                result.eligibility_count != 0
                 or summary.audit_replacement_captures_pending != 1
                 or summary.audit_ineligible_books != 1
             ):
@@ -820,7 +820,7 @@ def _replacement_snapshot_only_factory(config: Phase1Config) -> OperationFactory
                 "replacement_captures_pending": summary.audit_replacement_captures_pending,
                 "snapshot_channel": replacement.channel,
                 "snapshot_received_monotonic_ns": replacement.received_monotonic.nanoseconds,
-                "snapshot_scan_count": result.scan_count,
+                "snapshot_eligibility_count": result.eligibility_count,
                 "terminal_hash": summary.terminal_hash,
             }
 
@@ -926,7 +926,7 @@ def _replacement_capture_close_factory(config: Phase1Config) -> OperationFactory
             )
             digest_bound = control.get("capture_state_sha256") == capture_digest
             if (
-                result.scan_count != 1
+                result.eligibility_count != 1
                 or summary.audit_divergences_pending != 0
                 or summary.audit_replacement_captures_pending != 0
                 or summary.audit_ineligible_books != 0
@@ -948,7 +948,7 @@ def _replacement_capture_close_factory(config: Phase1Config) -> OperationFactory
                 "raw_sources_bound": raw_sources_bound,
                 "release_control_channel": release.channel,
                 "release_decision_monotonic_ns": release.received_monotonic.nanoseconds,
-                "release_scan_count": result.scan_count,
+                "release_eligibility_count": result.eligibility_count,
                 "replacement_captures_pending": summary.audit_replacement_captures_pending,
                 "terminal_hash": summary.terminal_hash,
             }

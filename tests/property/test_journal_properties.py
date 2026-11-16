@@ -9,7 +9,7 @@ from pathlib import Path
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -17,9 +17,9 @@ from multi_market_arbitrage.core.ids import (
     VenueId,
     WriterId,
 )
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import (
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import (
     JournalDurabilityState,
     JournalMetricsSnapshot,
     JournalReader,
@@ -90,7 +90,7 @@ def test_sealed_journal_round_trip_and_hash_chain(payloads: list[bytes]) -> None
         assert writer.durability_watermark is not None
         assert writer.durability_watermark.state is JournalDurabilityState.VERIFIED
 
-    with tempfile.TemporaryDirectory(prefix="mma-journal-property-", dir="/tmp") as directory:
+    with tempfile.TemporaryDirectory(prefix="ppm-journal-property-", dir="/tmp") as directory:
         asyncio.run(scenario(Path(directory)))
 
 
@@ -163,5 +163,5 @@ def test_group_commit_preserves_bytes_segment_hashes_and_receipt_coverage(
         assert grouped_metrics.durable == baseline_metrics.durable == len(payloads)
         assert grouped_metrics.data_fsyncs <= baseline_metrics.data_fsyncs
 
-    with tempfile.TemporaryDirectory(prefix="mma-journal-group-property-", dir="/tmp") as directory:
+    with tempfile.TemporaryDirectory(prefix="ppm-journal-group-property-", dir="/tmp") as directory:
         asyncio.run(scenario(Path(directory)))

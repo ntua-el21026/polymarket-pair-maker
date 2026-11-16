@@ -6,13 +6,13 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.config import load_phase1_config
-from multi_market_arbitrage.core.ids import CollectorRunId
-from multi_market_arbitrage.pipeline import (
+from polymarket_pair_maker.core.config import load_phase1_config
+from polymarket_pair_maker.core.ids import CollectorRunId
+from polymarket_pair_maker.pipeline import (
     CONTROL_REST_AUDIT_REPLACEMENT_RELEASE,
     WS_MARKET,
 )
-from multi_market_arbitrage.pipeline.health import (
+from polymarket_pair_maker.pipeline.health import (
     AUDIT_DIVERGENCE_PENDING_REPRESENTATIVE_SCHEMA,
     AUDIT_DIVERGENCE_RESOLUTION_REPRESENTATIVE_SCHEMA,
     MAXIMUM_AUDIT_DIVERGENCE_RESOLUTION_REPRESENTATIVES,
@@ -54,15 +54,6 @@ from benchmarks.gate1_reported_top import (  # noqa: E402
     fixture_bindings as reported_top_fixture_bindings,
 )
 from benchmarks.gate1_reported_top import run_benchmark as run_reported_top_benchmark  # noqa: E402
-from benchmarks.gate1_scan_report import (  # noqa: E402
-    ScanReportBenchmark,
-    _whole_units_per_second,  # pyright: ignore[reportPrivateUsage]
-)
-from benchmarks.phase1_performance import (  # noqa: E402
-    RESULT_SCHEMA,
-    audit_http_benchmark,
-    audit_pipeline_benchmarks,
-)
 
 
 def test_health_benchmark_uses_production_checkpoint_builder() -> None:
@@ -74,7 +65,7 @@ def test_health_benchmark_uses_production_checkpoint_builder() -> None:
     checkpoint = build()
 
     assert HEALTH_RESULT_SCHEMA == "gate1-health-benchmark-v2"
-    assert checkpoint.schema_version == "gate1-health-checkpoint-v3"
+    assert checkpoint.schema_version == "ppm-health-checkpoint-v1"
     assert checkpoint.gate1_eligible_so_far
     assert checkpoint.target["mode"] == "EXPLICIT_GATE1"
     assert len(checkpoint.books) == 2
@@ -128,7 +119,7 @@ def test_audit_divergence_benchmark_covers_changed_paths_and_capacity() -> None:
         replay_repetitions=1,
     )
 
-    assert AUDIT_DIVERGENCE_RESULT_SCHEMA == "mma-gate1-audit-divergence-benchmark-v1"
+    assert AUDIT_DIVERGENCE_RESULT_SCHEMA == "ppm-audit-divergence-benchmark-v1"
     assert result["schema_version"] == AUDIT_DIVERGENCE_RESULT_SCHEMA
     series_items = cast(tuple[dict[str, object], ...], result["series"])
     series = {cast(str, item["name"]): item for item in series_items}
@@ -186,9 +177,9 @@ def test_audit_divergence_benchmark_covers_changed_paths_and_capacity() -> None:
     release_validation = cast(
         dict[str, object], replacement_submeasurements["release_control"]["validation"]
     )
-    assert snapshot_validation["snapshot_scan_count"] == 0
+    assert snapshot_validation["snapshot_eligibility_count"] == 0
     assert snapshot_validation["replacement_captures_pending"] == 1
-    assert release_validation["release_scan_count"] == 1
+    assert release_validation["release_eligibility_count"] == 1
     assert release_validation["replacement_captures_pending"] == 0
     for submeasurement in replacement_submeasurements.values():
         timing = cast(dict[str, int], submeasurement["timing"])
@@ -278,41 +269,6 @@ async def test_health_benchmark_measures_availability_fsync_and_file_growth(
     assert (tmp_path / f"run-{run_id.value}.availability-intervals.jsonl").is_file()
 
 
-def test_scan_report_benchmark_emits_conservative_integral_throughput() -> None:
-    assert {
-        "compressed_bytes_per_second",
-        "rows_per_second",
-        "selected_materialized_bytes_per_second",
-    }.issubset(ScanReportBenchmark.__dataclass_fields__)
-    assert _whole_units_per_second(12_345, 2_000_000_000) == 6_172
-    assert _whole_units_per_second(0, 1) == 0
-    with pytest.raises(ValueError, match="throughput inputs"):
-        _whole_units_per_second(1, 0)
-
-
-@pytest.mark.asyncio
-async def test_phase1_benchmark_executes_production_audit_http_series() -> None:
-    result = await audit_http_benchmark()
-
-    assert RESULT_SCHEMA == "mma-phase1-performance-final-c-v2"
-    assert result["name"] == "audit_http_adapter_success_mock_transport"
-    assert result["sample_count"] == 50
-    assert result["extra"]["endpoint_class"] == "CLOB_BOOK"
-    assert result["extra"]["network_latency_included"] is False
-
-
-def test_phase1_benchmark_executes_barrier_and_classification_series() -> None:
-    results = audit_pipeline_benchmarks()
-
-    assert [result["name"] for result in results] == [
-        "audit_barrier_catchup_64_messages",
-        "audit_classification_match",
-    ]
-    assert results[0]["extra"]["barrier_lag_messages"] == 64
-    assert results[0]["extra"]["validated_outcome_after_barrier"] == "MATCH"
-    assert results[1]["extra"]["outcome"] == "MATCH"
-
-
 def test_reported_top_benchmark_binds_corpus_and_all_production_path_series() -> None:
     bindings = reported_top_fixture_bindings()
     expected_hashes = {
@@ -325,7 +281,7 @@ def test_reported_top_benchmark_binds_corpus_and_all_production_path_series() ->
 
     result = run_reported_top_benchmark(warmups=0, repetitions=1)
 
-    assert REPORTED_TOP_RESULT_SCHEMA == "mma-gate1-reported-top-benchmark-v1"
+    assert REPORTED_TOP_RESULT_SCHEMA == "ppm-reported-top-benchmark-v1"
     assert result["schema_version"] == REPORTED_TOP_RESULT_SCHEMA
     evidence = cast(dict[str, object], result["evidence"])
     assert evidence["production_path"] == "CanonicalProcessor.process_replayed"

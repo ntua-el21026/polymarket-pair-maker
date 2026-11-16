@@ -3,16 +3,17 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.ids import VenueId
-from multi_market_arbitrage.core.serialization import canonical_json_bytes, canonical_sha256
-from multi_market_arbitrage.research import validate_data
-from multi_market_arbitrage.research import validation as validation_module
-from multi_market_arbitrage.storage import (
+from polymarket_pair_maker.core.ids import VenueId
+from polymarket_pair_maker.core.serialization import canonical_json_bytes, canonical_sha256
+from polymarket_pair_maker.research import validate_data
+from polymarket_pair_maker.research import validation as validation_module
+from polymarket_pair_maker.storage import (
     AnalyticalDatasetConfig,
     AnalyticalDatasetWriter,
     AnalyticalProvenance,
@@ -23,8 +24,8 @@ from multi_market_arbitrage.storage import (
     rebuild_dataset_manifest,
     validate_dataset_manifest,
 )
-from multi_market_arbitrage.storage import analytical as analytical_module
-from multi_market_arbitrage.storage import query as query_module
+from polymarket_pair_maker.storage import analytical as analytical_module
+from polymarket_pair_maker.storage import query as query_module
 
 
 def provenance() -> AnalyticalProvenance:
@@ -391,3 +392,20 @@ def test_duckdb_enforces_result_row_limit_and_external_access_setting(tmp_path: 
             query.query("SELECT * FROM range(3)")
         with pytest.raises(ReadOnlyQueryError, match=r"rejected|read-only"):
             query.query("SELECT * FROM read_csv_auto/**/('/tmp/outside.csv')")
+
+
+@pytest.mark.parametrize(
+    "schema_version", ["phase1-reference-flat-v1", "ppm-binary-book-eligibility-flat-v1"]
+)
+def test_foundation_fragments_require_completed_run_claim(
+    tmp_path: Path, schema_version: str
+) -> None:
+    writer = AnalyticalDatasetWriter(
+        replace(config(tmp_path), dataset="book_eligibility", schema_version=schema_version),
+        provenance(),
+    )
+    writer.append({"market_id": "synthetic", "disposition": "BLOCKED"})
+    writer.close()
+    result = validate_data(tmp_path)
+    assert not result.valid
+    assert any("no completed" in error and "run claim" in error for error in result.errors)

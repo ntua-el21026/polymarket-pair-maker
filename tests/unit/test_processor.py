@@ -8,23 +8,27 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.config import Phase1Config, load_phase1_config
-from multi_market_arbitrage.core.errors import ProgrammingInvariantViolation, StorageFault
-from multi_market_arbitrage.core.health import BookHealth
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.config import Phase1Config, load_phase1_config
+from polymarket_pair_maker.core.errors import ProgrammingInvariantViolation, StorageFault
+from polymarket_pair_maker.core.health import BookHealth
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     InstrumentId,
     SubscriptionId,
 )
-from multi_market_arbitrage.core.provenance import Provenance, RawSourceRef
-from multi_market_arbitrage.core.serialization import canonical_json_bytes
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import JournalDurabilityState, JournalReceipt
-from multi_market_arbitrage.normalization import CanonicalEvent, CanonicalEventType
-from multi_market_arbitrage.normalization import polymarket as normalization_module
-from multi_market_arbitrage.pipeline import (
+from polymarket_pair_maker.core.provenance import Provenance, RawSourceRef
+from polymarket_pair_maker.core.serialization import canonical_json_bytes
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import JournalDurabilityState, JournalReceipt
+from polymarket_pair_maker.market_data import (
+    BinaryBookEligibilityAssessment,
+    EligibilityDisposition,
+)
+from polymarket_pair_maker.normalization import CanonicalEvent, CanonicalEventType
+from polymarket_pair_maker.normalization import polymarket as normalization_module
+from polymarket_pair_maker.pipeline import (
     CLOB_MARKET_PREFIX,
     CONTROL_BOOK_INVALIDATION,
     CONTROL_REST_AUDIT_CLASSIFY,
@@ -47,26 +51,21 @@ from multi_market_arbitrage.pipeline import (
     AuditOutcome,
     AuditStartEvidence,
     CanonicalProcessor,
+    EligibilityTriggerReason,
     ProcessedEnvelope,
-    ScanTriggerReason,
     WebSocketAdmissionWatermark,
 )
-from multi_market_arbitrage.pipeline import processor as processor_module
-from multi_market_arbitrage.pipeline.audit import (
+from polymarket_pair_maker.pipeline import processor as processor_module
+from polymarket_pair_maker.pipeline.audit import (
     AUDIT_REPLACEMENT_CAPTURE_MAX_BYTES,
     AUDIT_START_V1_SCHEMA,
     AUDIT_START_V2_SCHEMA,
     AuditReplacementReleaseCommand,
     AuditTriggerReason,
 )
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID, ReferenceBundle
-from multi_market_arbitrage.research import Phase1AnalyticalOutputs
-from multi_market_arbitrage.scanners.polymarket_complete_set import (
-    CompleteSetScanResult,
-    OpportunityLifecycle,
-    ScanDisposition,
-)
-from multi_market_arbitrage.state import InvalidationReason
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID, ReferenceBundle
+from polymarket_pair_maker.research import Phase1AnalyticalOutputs
+from polymarket_pair_maker.state import InvalidationReason
 
 FIXTURES = Path(__file__).parents[1] / "golden" / "fixtures"
 _BASE_TIME_NS = 1_787_198_410_000_000_000
@@ -359,7 +358,7 @@ def _bootstrap_hard_expiry_ns(
 ) -> int:
     if freshness_ns is None:
         freshness_ns = 102 if native_asset_id == "token-yes" else 103
-    return freshness_ns + int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    return freshness_ns + int(config.eligibility.maximum_book_age_seconds * 1_000_000_000)
 
 
 def _bootstrap(run_id: CollectorRunId) -> tuple[RawEventEnvelope, ...]:
@@ -385,7 +384,7 @@ class _RecordingOutputs(Phase1AnalyticalOutputs):
     def __init__(self) -> None:
         self.references: list[tuple[ReferenceBundle, UtcTimestamp, Provenance]] = []
         self.canonical_events: list[CanonicalEvent] = []
-        self.scans: list[CompleteSetScanResult] = []
+        self.eligibility_assessments: list[BinaryBookEligibilityAssessment] = []
 
     def append_reference(
         self,
@@ -398,14 +397,11 @@ class _RecordingOutputs(Phase1AnalyticalOutputs):
     def append_canonical(self, event: CanonicalEvent) -> None:
         self.canonical_events.append(event)
 
-    def append_scan(
+    def append_eligibility(
         self,
-        result: CompleteSetScanResult,
-        *,
-        lifecycle: OpportunityLifecycle | None = None,
+        result: BinaryBookEligibilityAssessment,
     ) -> None:
-        del lifecycle
-        self.scans.append(result)
+        self.eligibility_assessments.append(result)
 
 
 class _FailingCanonicalOutputs(_RecordingOutputs):
@@ -652,18 +648,18 @@ def test_websocket_payload_is_strictly_parsed_once(
     assert calls == 1
 
 
-def test_scan_latency_observer_receives_one_sample_per_dirty_market_scan() -> None:
+def test_eligibility_latency_observer_receives_one_sample_per_dirty_market_scan() -> None:
     config = load_phase1_config(Path("config/phase1.toml"))
     run_id = CollectorRunId("processor-scan-latency-observer")
     samples: list[int] = []
-    processor = CanonicalProcessor(config, scan_latency_observer=samples.append)
-    scan_count = 0
+    processor = CanonicalProcessor(config, eligibility_latency_observer=samples.append)
+    eligibility_count = 0
 
     for envelope in _bootstrap(run_id):
-        scan_count += processor.process_replayed(envelope).scan_count
+        eligibility_count += processor.process_replayed(envelope).eligibility_count
 
-    assert scan_count > 0
-    assert len(samples) == scan_count
+    assert eligibility_count > 0
+    assert len(samples) == eligibility_count
     assert all(sample >= 0 for sample in samples)
 
 
@@ -760,7 +756,9 @@ def test_bound_audit_start_rejects_forged_expiry_and_missing_freshness() -> None
     for envelope in _bootstrap(run_id):
         assert processor.process_replayed(envelope).success
     true_expiry_ns = _bootstrap_hard_expiry_ns(config)
-    forged_expiry_ns = true_expiry_ns + int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    forged_expiry_ns = true_expiry_ns + int(
+        config.eligibility.maximum_book_age_seconds * 1_000_000_000
+    )
     forged_start, forged_intent = _audit_start(
         processor,
         run_id,
@@ -1181,7 +1179,9 @@ def test_deferred_match_uses_response_freshness_and_expiry_equality_fails() -> N
     assert matched.success
     assert matched.audit_outcomes[0].outcome is AuditOutcome.MATCH
     assert matched.book_freshness_updates[0].received_monotonic == response.received_monotonic
-    assert matched.scan_source_received_monotonic_ns == response.received_monotonic.nanoseconds
+    assert (
+        matched.eligibility_source_received_monotonic_ns == response.received_monotonic.nanoseconds
+    )
 
     equality_processor = CanonicalProcessor(config)
     equality_run = CollectorRunId("processor-deferred-audit-expiry-equality")
@@ -1352,7 +1352,7 @@ def test_rest_audit_counts_matches_and_invalidates_on_exact_mismatch() -> None:
     yes_instrument = processor.current_bundles[0].instrument_for_token("token-yes").instrument_id
     owner = next(item for item in processor.owners if item.instrument_id == yes_instrument)
     before = owner.snapshot()
-    scans_before = processor.summary().scans
+    assessments_before = processor.summary().eligibility_assessments
 
     matching_start, matching_intent = _audit_start(
         processor,
@@ -1378,14 +1378,14 @@ def test_rest_audit_counts_matches_and_invalidates_on_exact_mismatch() -> None:
     assert matched.generation == before.generation
     assert matched.bids == before.bids
     assert matched.asks == before.asks
-    assert matching_result.scan_count == 1
+    assert matching_result.eligibility_count == 1
     assert len(matching_result.book_freshness_updates) == 1
     assert matching_result.book_freshness_updates[0].instrument_id == yes_instrument
     assert matching_result.book_freshness_updates[0].received_monotonic == (
         matching.received_monotonic
     )
-    assert matching_result.scan_triggers[0].reasons == (ScanTriggerReason.REST_AUDIT,)
-    assert processor.summary().scans == scans_before + 1
+    assert matching_result.eligibility_triggers[0].reasons == (EligibilityTriggerReason.REST_AUDIT,)
+    assert processor.summary().eligibility_assessments == assessments_before + 1
 
     mismatched_payload = _fixture("polymarket_rest_book_yes.json").replace(
         b'"price": "0.40", "size": "10"',
@@ -1417,9 +1417,9 @@ def test_rest_audit_counts_matches_and_invalidates_on_exact_mismatch() -> None:
     assert diagnostic.exact_depth_difference.difference_count == 1
     assert diagnostic.response_source.ingest_id == mismatching.ingest_id
     assert diagnostic.response_source.payload_sha256 == mismatching.payload_sha256
-    assert mismatch_result.scan_count == 0
+    assert mismatch_result.eligibility_count == 0
     assert not mismatch_result.book_freshness_updates
-    assert mismatch_result.scan_triggers[0].reasons == (ScanTriggerReason.REST_AUDIT,)
+    assert mismatch_result.eligibility_triggers[0].reasons == (EligibilityTriggerReason.REST_AUDIT,)
     assert owner.snapshot().health is BookHealth.INVALID
     assert owner.snapshot().invalidation_reason is InvalidationReason.REST_AUDIT_MISMATCH
     assert summary.rest_audits == 2
@@ -1435,7 +1435,7 @@ def test_rest_audit_counts_matches_and_invalidates_on_exact_mismatch() -> None:
     assert not summary.audit_mismatch_diagnostics_truncated
     assert summary.pending_rest_audits == 0
     assert summary.parse_failures == 0
-    assert summary.scans == scans_before + 1
+    assert summary.eligibility_assessments == assessments_before + 1
 
 
 def test_v1_audit_start_replays_byte_exact_with_unknown_legacy_trigger() -> None:
@@ -1651,7 +1651,7 @@ def test_mismatch_divergence_closes_only_on_separate_authoritative_rest_snapshot
 
     replacement_connection = ConnectionId("processor-test-replacement-connection")
     maximum_age_ns = int(
-        load_phase1_config(Path("config/phase1.toml")).scanner.maximum_book_age_seconds
+        load_phase1_config(Path("config/phase1.toml")).eligibility.maximum_book_age_seconds
         * 1_000_000_000
     )
     first_yes = processor.process_replayed(
@@ -1678,8 +1678,8 @@ def test_mismatch_divergence_closes_only_on_separate_authoritative_rest_snapshot
     )
     assert first_yes.success
     assert stale_sibling.success
-    assert first_yes.scan_count == 0
-    assert stale_sibling.scan_count == 0
+    assert first_yes.eligibility_count == 0
+    assert stale_sibling.eligibility_count == 0
     assert processor.summary().audit_replacement_captures_pending == 1
     assert processor.audit_ineligible_instruments == (pending.instrument_id,)
 
@@ -1695,7 +1695,7 @@ def test_mismatch_divergence_closes_only_on_separate_authoritative_rest_snapshot
         )
     )
     assert fresh_yes.success
-    assert fresh_yes.scan_count == 0
+    assert fresh_yes.eligibility_count == 0
     assert processor.summary().audit_replacement_captures_pending == 1
     assert processor.audit_ineligible_instruments == (pending.instrument_id,)
 
@@ -1719,7 +1719,7 @@ def test_mismatch_divergence_closes_only_on_separate_authoritative_rest_snapshot
         )
     )
     assert released.success
-    assert released.scan_count == 1
+    assert released.eligibility_count == 1
     assert processor.summary().audit_replacement_captures_pending == 0
     assert processor.audit_ineligible_instruments == ()
 
@@ -1770,10 +1770,10 @@ def test_v1_replacement_capture_auto_release_remains_byte_replay_compatible() ->
     assert processor.process_replayed(intent).success
     assert processor.process_replayed(mismatch).needs_resync
     assert processor.process_replayed(resnapshot).success
-    assert processor.process_replayed(replacement_yes).scan_count == 0
+    assert processor.process_replayed(replacement_yes).eligibility_count == 0
     final_snapshot = processor.process_replayed(replacement_no)
     assert final_snapshot.success
-    assert final_snapshot.scan_count == 1
+    assert final_snapshot.eligibility_count == 1
     assert processor.summary().audit_replacement_captures_pending == 0
     assert processor.audit_ineligible_instruments == ()
     assert (
@@ -1845,7 +1845,7 @@ def _pending_v2_replacement_release(
         )
     )
     assert final_snapshot.success
-    assert final_snapshot.scan_count == 0
+    assert final_snapshot.eligibility_count == 0
     commands = processor.audit_replacement_release_commands(
         connection_id=replacement_connection,
         decision_monotonic=MonotonicTimestamp(run_id.value, 2_001),
@@ -1950,8 +1950,8 @@ def test_v2_replacement_capture_rejects_unbound_or_pre_resolution_snapshot(
 
     assert not rejected.success
     assert rejected.error_type == "NormalizationError"
-    assert rejected.scan_count == 0
-    assert after.scans == before.scans
+    assert rejected.eligibility_count == 0
+    assert after.eligibility_assessments == before.eligibility_assessments
     assert after.canonical_events == before.canonical_events
     assert processor.snapshots() == before_snapshots
     assert after.audit_replacement_captures_pending == 1
@@ -2020,7 +2020,7 @@ def test_v2_replacement_release_control_rejects_invalid_freshness_chronology(
     config, run_id, processor, replacement_connection, valid = _pending_v2_replacement_release(
         invalid_time
     )
-    maximum_age_ns = int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    maximum_age_ns = int(config.eligibility.maximum_book_age_seconds * 1_000_000_000)
     if invalid_time == "cross_epoch":
         invalid = replace(valid, monotonic_epoch_id=f"{run_id.value}-other")
         envelope_monotonic_ns = valid.decision_monotonic_ns
@@ -2066,7 +2066,7 @@ def test_v2_replacement_release_rejects_decision_before_latest_required_l2() -> 
         )
     )
     assert intervening.success
-    assert intervening.scan_count == 0
+    assert intervening.eligibility_count == 0
     assert not processor.audit_replacement_release_commands(
         connection_id=replacement_connection,
         decision_monotonic=MonotonicTimestamp(
@@ -2090,8 +2090,8 @@ def test_v2_replacement_release_rejects_decision_before_latest_required_l2() -> 
 
     assert not rejected.success
     assert rejected.error_type == "NormalizationError"
-    assert rejected.scan_count == 0
-    assert after.scans == before.scans
+    assert rejected.eligibility_count == 0
+    assert after.eligibility_assessments == before.eligibility_assessments
     assert after.audit_replacement_captures_pending == 1
     assert after.audit_ineligible_books == 1
 
@@ -2122,7 +2122,7 @@ def test_v2_replacement_release_waits_for_sibling_reported_top_reconciliation() 
         )
     )
     assert sibling_transition.success
-    assert sibling_transition.scan_count == 0
+    assert sibling_transition.eligibility_count == 0
     assert len(processor.reported_top_transitions) == 1
     assert not processor.audit_replacement_release_commands(
         connection_id=replacement_connection,
@@ -2140,7 +2140,7 @@ def test_v2_replacement_release_waits_for_sibling_reported_top_reconciliation() 
         )
     )
     assert not rejected.success
-    assert rejected.scan_count == 0
+    assert rejected.eligibility_count == 0
     assert processor.summary().audit_replacement_captures_pending == 1
 
     reconciled = processor.process_replayed(
@@ -2155,7 +2155,7 @@ def test_v2_replacement_release_waits_for_sibling_reported_top_reconciliation() 
         )
     )
     assert reconciled.success
-    assert reconciled.scan_count == 0
+    assert reconciled.eligibility_count == 0
     assert not processor.reported_top_transitions
     commands = processor.audit_replacement_release_commands(
         connection_id=replacement_connection,
@@ -2174,7 +2174,7 @@ def test_v2_replacement_release_waits_for_sibling_reported_top_reconciliation() 
         )
     )
     assert released.success
-    assert released.scan_count == 1
+    assert released.eligibility_count == 1
     assert processor.summary().audit_replacement_captures_pending == 0
     assert not processor.audit_ineligible_instruments
 
@@ -2231,7 +2231,7 @@ def test_v2_multi_capture_group_restores_only_after_final_control() -> None:
                 connection_id=replacement_connection,
                 transport_metadata={"websocket_admission_ordinal": 1},
             )
-        ).scan_count
+        ).eligibility_count
         == 0
     )
     assert (
@@ -2245,7 +2245,7 @@ def test_v2_multi_capture_group_restores_only_after_final_control() -> None:
                 connection_id=replacement_connection,
                 transport_metadata={"websocket_admission_ordinal": 2},
             )
-        ).scan_count
+        ).eligibility_count
         == 0
     )
     commands = processor.audit_replacement_release_commands(
@@ -2265,7 +2265,7 @@ def test_v2_multi_capture_group_restores_only_after_final_control() -> None:
         )
     )
     assert first.success
-    assert first.scan_count == 0
+    assert first.eligibility_count == 0
     assert processor.summary().audit_replacement_captures_pending == 1
     second = processor.process_replayed(
         _envelope(
@@ -2278,7 +2278,7 @@ def test_v2_multi_capture_group_restores_only_after_final_control() -> None:
         )
     )
     assert second.success
-    assert second.scan_count == 1
+    assert second.eligibility_count == 1
     assert processor.summary().audit_replacement_captures_pending == 0
     assert not processor.audit_ineligible_instruments
 
@@ -2337,8 +2337,8 @@ def test_v2_replacement_release_rejects_invalid_durable_evidence_without_mutatio
 
     assert not rejected.success
     assert rejected.error_type == "NormalizationError"
-    assert rejected.scan_count == 0
-    assert after.scans == before.scans
+    assert rejected.eligibility_count == 0
+    assert after.eligibility_assessments == before.eligibility_assessments
     assert (
         after.audit_replacement_captures_pending == before.audit_replacement_captures_pending == 1
     )
@@ -2634,7 +2634,7 @@ def test_unknown_v2_divergence_cannot_restore_research_eligibility() -> None:
 
     assert first.success
     assert second.success
-    assert first.scan_count == second.scan_count == 0
+    assert first.eligibility_count == second.eligibility_count == 0
     assert not processor.audit_replacement_release_commands(
         connection_id=replacement_connection,
         decision_monotonic=MonotonicTimestamp(run_id.value, 2_001),
@@ -2845,7 +2845,7 @@ def test_rest_audit_failure_blocks_eligibility_without_forcing_socket_resync() -
     )
     assert owner.health is BookHealth.HEALTHY
     assert ambiguous.audit_ineligible_instruments == (owner.instrument_id,)
-    assert ambiguous.scan_results[-1].disposition is ScanDisposition.BLOCKED
+    assert ambiguous.eligibility_assessments[-1].disposition is EligibilityDisposition.BLOCKED
     assert ambiguous.summary().audit_ineligible_books == 1
 
     explicit = CanonicalProcessor(config)
@@ -2929,10 +2929,10 @@ def test_changed_best_bid_ask_blocks_until_ordered_price_change_reconciles_l2() 
     assert reported.success
     assert not reported.needs_resync
     assert reported.canonical_event_count == 1
-    assert reported.scan_count == 1
+    assert reported.eligibility_count == 1
     assert not reported.book_freshness_updates
-    assert reported.scan_triggers[0].reasons == (ScanTriggerReason.BOOK_UPDATE,)
-    assert processor.scan_results[-1].disposition is ScanDisposition.BLOCKED
+    assert reported.eligibility_triggers[0].reasons == (EligibilityTriggerReason.BOOK_UPDATE,)
+    assert processor.eligibility_assessments[-1].disposition is EligibilityDisposition.BLOCKED
     assert processor.audit_ineligible_instruments == (owner.instrument_id,)
     assert owner.snapshot().economic_content_sha256() == before.economic_content_sha256()
     after_report = processor.audit_book_identity("token-yes")
@@ -2950,7 +2950,7 @@ def test_changed_best_bid_ask_blocks_until_ordered_price_change_reconciles_l2() 
 
     assert reconciled.success
     assert not reconciled.needs_resync
-    assert reconciled.scan_count == 1
+    assert reconciled.eligibility_count == 1
     assert len(reconciled.book_freshness_updates) == 1
     assert processor.audit_ineligible_instruments == ()
     best_bid = owner.snapshot().best_bid
@@ -3108,7 +3108,7 @@ def test_lagging_rest_match_cannot_clear_a_contradictory_pending_best_bid_ask() 
     assert refused.success
     assert not refused.needs_resync
     assert not refused.book_freshness_updates
-    assert refused.scan_count == 1
+    assert refused.eligibility_count == 1
     assert owner.snapshot() == before
     assert len(refused.audit_outcomes) == 1
     outcome = refused.audit_outcomes[0]
@@ -3134,14 +3134,14 @@ def test_lagging_rest_match_cannot_clear_a_contradictory_pending_best_bid_ask() 
     assert replayed.summary().terminal_hash == processor.summary().terminal_hash
 
 
-def test_scan_dirty_is_coalesced_and_last_trade_is_diagnostic_only() -> None:
+def test_eligibility_dirty_is_coalesced_and_last_trade_is_diagnostic_only() -> None:
     processor = CanonicalProcessor(load_phase1_config(Path("config/phase1.toml")))
-    run_id = CollectorRunId("processor-scan-dirty")
+    run_id = CollectorRunId("processor-admission-dirty")
     for envelope in _bootstrap(run_id):
         assert processor.process_replayed(envelope).success
     yes_instrument = processor.current_bundles[0].instrument_for_token("token-yes").instrument_id
     owner = next(item for item in processor.owners if item.instrument_id == yes_instrument)
-    scans_before = processor.summary().scans
+    assessments_before = processor.summary().eligibility_assessments
 
     update = _envelope(
         run_id,
@@ -3153,8 +3153,8 @@ def test_scan_dirty_is_coalesced_and_last_trade_is_diagnostic_only() -> None:
 
     assert updated.success
     assert updated.canonical_event_count == 1
-    assert updated.scan_count == 1
-    assert updated.scan_triggers[0].reasons == (ScanTriggerReason.BOOK_UPDATE,)
+    assert updated.eligibility_count == 1
+    assert updated.eligibility_triggers[0].reasons == (EligibilityTriggerReason.BOOK_UPDATE,)
     assert len(updated.book_freshness_updates) == 1
     assert updated.book_freshness_updates[0].instrument_id == yes_instrument
     assert updated.book_freshness_updates[0].received_monotonic == update.received_monotonic
@@ -3173,10 +3173,10 @@ def test_scan_dirty_is_coalesced_and_last_trade_is_diagnostic_only() -> None:
 
     assert traded.success
     assert traded.canonical_event_count == 1
-    assert traded.scan_count == 0
-    assert not traded.scan_triggers
+    assert traded.eligibility_count == 0
+    assert not traded.eligibility_triggers
     assert not traded.book_freshness_updates
-    assert processor.summary().scans == scans_before + 1
+    assert processor.summary().eligibility_assessments == assessments_before + 1
     assert owner.economic_content_sha256() == economic_hash
     assert owner.snapshot().last_source_event_id == l2_source_event_id
     assert owner.snapshot().state_source_provenance == l2_provenance
@@ -3185,7 +3185,7 @@ def test_scan_dirty_is_coalesced_and_last_trade_is_diagnostic_only() -> None:
 
 def test_ws_l2_deadline_equality_is_accepted_and_strict_overrun_requires_rest() -> None:
     config = load_phase1_config(Path("config/phase1.toml"))
-    maximum_age_ns = int(config.scanner.maximum_book_age_seconds * 1_000_000_000)
+    maximum_age_ns = int(config.eligibility.maximum_book_age_seconds * 1_000_000_000)
     update_payload = _fixture("polymarket_ws_price_change.json")
 
     equality_run = CollectorRunId("processor-l2-deadline-equality")
@@ -3202,7 +3202,7 @@ def test_ws_l2_deadline_equality_is_accepted_and_strict_overrun_requires_rest() 
     accepted = equality.process_replayed(at_deadline)
 
     assert accepted.success
-    assert accepted.scan_count == 1
+    assert accepted.eligibility_count == 1
     assert len(accepted.book_freshness_updates) == 1
     assert not accepted.needs_resync
 
@@ -3222,10 +3222,10 @@ def test_ws_l2_deadline_equality_is_accepted_and_strict_overrun_requires_rest() 
     yes_owner = next(item for item in overrun.owners if item.instrument_id == yes_instrument)
 
     assert rejected.success
-    assert rejected.scan_count == 1
+    assert rejected.eligibility_count == 1
     assert rejected.needs_resync
     assert not rejected.book_freshness_updates
-    assert rejected.scan_triggers[0].reasons == (ScanTriggerReason.INVALIDATION,)
+    assert rejected.eligibility_triggers[0].reasons == (EligibilityTriggerReason.INVALIDATION,)
     assert yes_owner.snapshot().health is BookHealth.INVALID
     assert yes_owner.snapshot().invalidation_reason is InvalidationReason.STALE_SNAPSHOT
 
@@ -3360,14 +3360,14 @@ def test_processor_history_retention_is_bounded_without_losing_exact_counts(
 
     summary = first.summary()
     assert summary == second.summary()
-    assert summary.scans > len(first.scan_results) == 2
-    assert summary.scan_results_truncated
+    assert summary.eligibility_assessments > len(first.eligibility_assessments) == 2
+    assert summary.eligibility_assessments_truncated
     assert summary.reference_refresh_requests == 3
     assert len(first.reference_refresh_requests) == 2
     assert summary.reference_refresh_requests_truncated
     assert len(summary.raw_input_chain_sha256) == 64
     assert len(summary.canonical_event_chain_sha256) == 64
-    assert len(summary.scan_chain_sha256) == 64
+    assert len(summary.eligibility_chain_sha256) == 64
 
 
 def test_terminal_hash_binds_hidden_audit_economic_generation_state() -> None:

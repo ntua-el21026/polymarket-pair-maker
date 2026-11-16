@@ -3,9 +3,9 @@ requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "multi-market-arbitrage"
+name = "polymarket-pair-maker"
 version = "0.1.0"
-description = "Read-only multi-market arbitrage research foundation"
+description = "Research-grade Polymarket liquidity-reward market making with adaptive YES/NO quoting, conservative execution modelling, inventory risk control, and deterministic replay."
 readme = "README.md"
 requires-python = ">=3.14.7,<3.15"
 dependencies = [
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mma = "multi_market_arbitrage.cli.main:main"
+ppm = "polymarket_pair_maker.cli.main:main"
 
 [dependency-groups]
 dev = [
@@ -38,7 +38,7 @@ prerelease = "disallow"
 required-version = "==0.12.5"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/multi_market_arbitrage"]
+packages = ["src/polymarket_pair_maker"]
 
 [tool.pytest.ini_options]
 # WSL commonly inherits TEMP/TMP paths on DrvFs. Pytest's fd-capture temporary

@@ -5,8 +5,8 @@ from io import StringIO
 
 import pytest
 
-from multi_market_arbitrage.core.ids import InstrumentId
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.core.ids import InstrumentId
+from polymarket_pair_maker.observability import (
     InMemoryMetrics,
     UnsafeLogFieldError,
     configure_json_logger,

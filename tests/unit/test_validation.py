@@ -1,8 +1,8 @@
 import pytest
 
-from multi_market_arbitrage.core.ids import ValidatorId, ValidatorVersion
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.core.validation import (
+from polymarket_pair_maker.core.ids import ValidatorId, ValidatorVersion
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.core.validation import (
     ValidationReason,
     ValidationReasonCode,
     ValidationRequirement,
@@ -71,13 +71,6 @@ def test_required_invalid_results_need_machine_readable_reasons() -> None:
             observed_at=_OBSERVED,
             reasons=(_reason(),),
         )
-
-
-def test_reason_codes_expose_phase1_specific_failures() -> None:
-    assert ValidationReasonCode.MARKET_NOT_OPEN.value == "MARKET_NOT_OPEN"
-    assert ValidationReasonCode.COST_RULE_MISMATCH.value == "COST_RULE_MISMATCH"
-    assert ValidationReasonCode.CAPACITY_EVALUATION_LIMIT.value == "CAPACITY_EVALUATION_LIMIT"
-    assert ValidationReasonCode.REFERENCE_VERSION_MISMATCH.value == ("REFERENCE_VERSION_MISMATCH")
 
 
 @pytest.mark.parametrize(

@@ -8,9 +8,9 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.ids import CollectorRunId
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.observability import (
+from polymarket_pair_maker.core.ids import CollectorRunId
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.observability import (
     HEALTH_CHECKPOINT_SCHEMA_VERSION,
     HEALTH_CHECKPOINT_V1_SCHEMA_VERSION,
     HEALTH_CHECKPOINT_V2_SCHEMA_VERSION,
@@ -57,7 +57,7 @@ def _checkpoint(
         analytical={"healthy": True, "rejections": 0},
         http={"attempts": 1, "retries": 0},
         audit={"FAILED": 0, "MATCH": 1, "MISMATCH": 0, "RACED": 0},
-        scanner={"scans": 1, "t_obs_ns": {"p50": 100}},
+        eligibility={"eligibility_assessments": 1, "t_obs_ns": {"p50": 100}},
         recovery={"data_loss": 0, "reconnects": 0, "resyncs": 0},
         resources={"free_disk_bytes": 1_000_000, "raw_run_bytes": 100},
         capture_healthy=True,
@@ -422,7 +422,7 @@ async def test_health_writer_publishes_bounded_canonical_jsonl(tmp_path: Path) -
     assert record["decisions"]["gate1_sticky_reason_codes"] == []
 
 
-def test_checkpoint_v3_chronology_uses_monotonic_when_utc_regresses() -> None:
+def test_current_checkpoint_chronology_uses_monotonic_when_utc_regresses() -> None:
     run_id = CollectorRunId.new()
     first = _checkpoint(run_id, emitted_monotonic_ns=10).to_record()
     second = _checkpoint(run_id, emitted_monotonic_ns=20).to_record()
@@ -436,12 +436,15 @@ def test_checkpoint_v3_chronology_uses_monotonic_when_utc_regresses() -> None:
     assert chronology.last_emitted_monotonic == MonotonicTimestamp(run_id.value, 20)
 
 
-def test_checkpoint_v2_chronology_remains_readable() -> None:
+@pytest.mark.parametrize(
+    "schema_version", [HEALTH_CHECKPOINT_V2_SCHEMA_VERSION, "gate1-health-checkpoint-v3"]
+)
+def test_legacy_checkpoint_chronology_remains_readable(schema_version: str) -> None:
     run_id = CollectorRunId.new()
     first = _checkpoint(run_id, emitted_monotonic_ns=10).to_record()
     second = _checkpoint(run_id, emitted_monotonic_ns=20).to_record()
-    first["schema_version"] = HEALTH_CHECKPOINT_V2_SCHEMA_VERSION
-    second["schema_version"] = HEALTH_CHECKPOINT_V2_SCHEMA_VERSION
+    first["schema_version"] = schema_version
+    second["schema_version"] = schema_version
     first_decisions = cast(dict[str, object], first["decisions"])
     second_decisions = cast(dict[str, object], second["decisions"])
     first_decisions.pop("gate1_sticky_reason_codes")
@@ -449,7 +452,7 @@ def test_checkpoint_v2_chronology_remains_readable() -> None:
 
     chronology = validate_health_checkpoint_chronology((first, second))
 
-    assert chronology.schema_version == HEALTH_CHECKPOINT_V2_SCHEMA_VERSION
+    assert chronology.schema_version == schema_version
     assert chronology.monotonic_chronology_available is True
     assert chronology.first_emitted_monotonic == MonotonicTimestamp(run_id.value, 10)
     assert chronology.last_emitted_monotonic == MonotonicTimestamp(run_id.value, 20)
@@ -481,7 +484,7 @@ def test_checkpoint_v1_compatibility_does_not_synthesize_monotonic_evidence() ->
     "mutation",
     ["epoch", "regression"],
 )
-def test_checkpoint_v3_chronology_rejects_epoch_mismatch_or_regression(
+def test_current_checkpoint_chronology_rejects_epoch_mismatch_or_regression(
     mutation: str,
 ) -> None:
     run_id = CollectorRunId.new()

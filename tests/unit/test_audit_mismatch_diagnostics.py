@@ -5,12 +5,12 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
-from multi_market_arbitrage.core.exact import ExactDecimal, Price, Quantity
-from multi_market_arbitrage.core.ids import ConnectionId, IngestId, InstrumentId, MarketId
-from multi_market_arbitrage.core.provenance import RawSourceRef
-from multi_market_arbitrage.core.serialization import canonical_json_bytes
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.pipeline.audit import (
+from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity
+from polymarket_pair_maker.core.ids import ConnectionId, IngestId, InstrumentId, MarketId
+from polymarket_pair_maker.core.provenance import RawSourceRef
+from polymarket_pair_maker.core.serialization import canonical_json_bytes
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.pipeline.audit import (
     AUDIT_MISMATCH_MAX_LEVELS_PER_SIDE,
     AUDIT_MISMATCH_MAX_RAW_SOURCES,
     AUDIT_MISMATCH_MAX_REPRESENTATIVE_DIFFERENCES,
@@ -24,7 +24,7 @@ from multi_market_arbitrage.pipeline.audit import (
     compare_audit_exact_depth,
     summarize_audit_raw_sources,
 )
-from multi_market_arbitrage.state.order_books.models import BookLevel
+from polymarket_pair_maker.state.order_books.models import BookLevel
 
 
 def _sha256(label: str) -> str:

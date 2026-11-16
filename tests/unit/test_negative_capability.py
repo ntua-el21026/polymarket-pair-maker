@@ -9,14 +9,14 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import cast, get_args, get_type_hints
 
-from multi_market_arbitrage.core.config import Phase1RuntimeRole, load_phase1_config
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.core.config import Phase1RuntimeRole, load_phase1_config
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketMarketWebSocket,
     PolymarketPublicClient,
 )
 
 REPOSITORY = Path(__file__).resolve().parents[2]
-PRODUCTION_PACKAGE = REPOSITORY / "src" / "multi_market_arbitrage"
+PRODUCTION_PACKAGE = REPOSITORY / "src" / "polymarket_pair_maker"
 
 _FORBIDDEN_IMPORT_ROOTS = {
     "ccxt",
@@ -204,7 +204,6 @@ def test_cli_surface_contains_no_execution_or_account_command() -> None:
         "polymarket",
         "rebuild-analytical",
         "replay",
-        "scan-report",
         "validate-data",
     }
     assert (

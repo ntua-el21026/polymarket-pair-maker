@@ -10,7 +10,7 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.ids import (
     CollectorRunId,
     ConnectionId,
     IngestId,
@@ -18,10 +18,10 @@ from multi_market_arbitrage.core.ids import (
     VenueId,
     WriterId,
 )
-from multi_market_arbitrage.core.serialization import canonical_json_bytes, canonical_sha256
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import (
+from polymarket_pair_maker.core.serialization import canonical_json_bytes, canonical_sha256
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import (
     JournalBackpressureError,
     JournalReader,
     JournalRecoveryError,
@@ -31,13 +31,13 @@ from multi_market_arbitrage.journal import (
     recover_partial_file,
     verify_sealed_segment,
 )
-from multi_market_arbitrage.journal.models import JournalCorruptionError
-from multi_market_arbitrage.journal.reader import (
+from polymarket_pair_maker.journal.models import JournalCorruptionError
+from polymarket_pair_maker.journal.reader import (
     DEFAULT_MAX_UNCOMPRESSED_SEGMENT_BYTES,
     completion_path_for_run,
 )
-from multi_market_arbitrage.journal.recovery import atomic_write_bytes
-from multi_market_arbitrage.research import validate_data
+from polymarket_pair_maker.journal.recovery import atomic_write_bytes
+from polymarket_pair_maker.research import validate_data
 
 
 def matching_paths(root: Path, pattern: str) -> list[Path]:
@@ -171,7 +171,7 @@ async def test_fsync_failure_propagates_and_never_claims_durable(
             raise OSError("injected disk failure")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", failing_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", failing_fsync)
     with pytest.raises(JournalWriteError, match="injected disk failure"):
         await writer.submit(envelope(run, 0))
     assert writer.durability_watermark is None
@@ -199,7 +199,7 @@ async def test_queue_saturation_is_explicit_backpressure(
             raise TimeoutError("test gate was not released")
         original_fsync(descriptor)
 
-    monkeypatch.setattr("multi_market_arbitrage.journal.writer.os.fsync", blocked_fsync)
+    monkeypatch.setattr("polymarket_pair_maker.journal.writer.os.fsync", blocked_fsync)
     first = asyncio.create_task(writer.submit(envelope(run, 0)))
     for _ in range(100):
         if writer.metrics.queue_depth == 0 and writer.metrics.enqueued == 1:
@@ -243,7 +243,7 @@ async def test_startup_completes_orphan_sealed_segment_after_manifest_crash(
     await first_writer.start()
     await first_writer.submit(envelope(run, 0, b'{"book":1}'))
 
-    import multi_market_arbitrage.journal.writer as writer_module
+    import polymarket_pair_maker.journal.writer as writer_module
 
     original_atomic_write = writer_module.atomic_write_bytes
 
@@ -280,7 +280,7 @@ async def test_partial_directory_entry_is_synced_before_durable_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     run = CollectorRunId("directory-sync-run")
-    import multi_market_arbitrage.journal.writer as writer_module
+    import polymarket_pair_maker.journal.writer as writer_module
 
     original_sync = writer_module.fsync_directory
     synchronized: list[Path] = []

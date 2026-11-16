@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from multi_market_arbitrage.core.exact import ExactDecimal, Price, Quantity
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity
+from polymarket_pair_maker.core.ids import (
     CanonicalEventId,
     CollectorRunId,
     ConnectionId,
@@ -17,11 +17,11 @@ from multi_market_arbitrage.core.ids import (
     SubscriptionId,
     VenueId,
 )
-from multi_market_arbitrage.core.provenance import RawSourceRef
-from multi_market_arbitrage.core.serialization import canonical_json_bytes
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.pipeline.audit import (
+from polymarket_pair_maker.core.provenance import RawSourceRef
+from polymarket_pair_maker.core.serialization import canonical_json_bytes
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.pipeline.audit import (
     AuditBookIdentity,
     AuditClassificationCommand,
     AuditMismatchCause,
@@ -29,19 +29,19 @@ from multi_market_arbitrage.pipeline.audit import (
     WebSocketAdmissionWatermark,
     compare_audit_exact_depth,
 )
-from multi_market_arbitrage.pipeline.channels import (
+from polymarket_pair_maker.pipeline.channels import (
     CONTROL_REST_AUDIT_CLASSIFY,
     CONTROL_REST_AUDIT_START,
     REST_BOOK_AUDIT,
     WS_MARKET,
 )
-from multi_market_arbitrage.pipeline.transitions import (
+from polymarket_pair_maker.pipeline.transitions import (
     ReportedTopTransition,
     ReportedTopTransitionEntrySource,
     ReportedTopTransitionReason,
     ReportedTopTransitionStatus,
 )
-from multi_market_arbitrage.research.audit_mismatch import (
+from polymarket_pair_maker.research.audit_mismatch import (
     AuditEqualityProof,
     AuditMatchingStateRepresentation,
     AuditMismatchCausalRelation,
@@ -54,7 +54,7 @@ from multi_market_arbitrage.research.audit_mismatch import (
     build_audit_mismatch_lineage_report,
     load_instrumented_replay_mismatch_observations,
 )
-from multi_market_arbitrage.state.order_books.models import BookLevel
+from polymarket_pair_maker.state.order_books.models import BookLevel
 
 _RUN = CollectorRunId("audit-mismatch-report-run")
 _CONNECTION = ConnectionId("audit-mismatch-report-connection")

@@ -9,9 +9,9 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.core.health import ComponentHealth
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.pipeline.channels import (
+from polymarket_pair_maker.core.health import ComponentHealth
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.pipeline.channels import (
     CLOB_MARKET_PREFIX,
     GAMMA_EVENT_PREFIX,
     GAMMA_MARKET_PREFIX,
@@ -19,17 +19,17 @@ from multi_market_arbitrage.pipeline.channels import (
     GAMMA_MARKETS_KEYSET,
     REST_BOOK,
 )
-from multi_market_arbitrage.pipeline.observe import (
+from polymarket_pair_maker.pipeline.observe import (
     PolymarketObservationService,
     _RawCaptureBoundary,  # pyright: ignore[reportPrivateUsage]
 )
-from multi_market_arbitrage.pipeline.processor import CanonicalProcessor, ProcessedEnvelope
-from multi_market_arbitrage.pipeline.targeting import (
+from polymarket_pair_maker.pipeline.processor import CanonicalProcessor, ProcessedEnvelope
+from polymarket_pair_maker.pipeline.targeting import (
     ObservationTargetMode,
     TargetSelectionError,
 )
-from multi_market_arbitrage.reference import PolymarketReferenceBuilder
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.reference import PolymarketReferenceBuilder
+from polymarket_pair_maker.venues.polymarket import (
     GammaMarket,
     PolymarketPublicClient,
     PolymarketSchemaError,
@@ -87,12 +87,12 @@ def _processed(
         ingest_seq=ingest_seq,
         success=success,
         canonical_event_count=0,
-        scan_count=0,
+        eligibility_count=0,
         needs_resync=False,
         affected_instrument_ids=(),
         reference_refresh_requests=(),
         book_freshness_updates=(),
-        scan_triggers=(),
+        eligibility_triggers=(),
         error_type=error_type,
     )
 
@@ -251,7 +251,7 @@ class _DiscoveryClientFixture(_ClientFixture):
 
 
 def _service(tmp_path: Path) -> PolymarketObservationService:
-    from multi_market_arbitrage.core.config import load_phase1_config
+    from polymarket_pair_maker.core.config import load_phase1_config
 
     return PolymarketObservationService(
         load_phase1_config(Path("config/phase1.toml")),
@@ -640,7 +640,7 @@ async def test_reference_refresh_rejects_frozen_target_identity_drift(
 
 
 def test_cli_forwards_explicit_gamma_market_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    cli = importlib.import_module("multi_market_arbitrage.cli.main")
+    cli = importlib.import_module("polymarket_pair_maker.cli.main")
     observed: dict[str, object] = {}
 
     class _Service:

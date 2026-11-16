@@ -11,9 +11,9 @@ from typing import cast
 
 import pytest
 
-from multi_market_arbitrage.cli.main import EXIT_OK, EXIT_REPLAY_MISMATCH, main
-from multi_market_arbitrage.core.config import load_phase1_config
-from multi_market_arbitrage.core.ids import (
+from polymarket_pair_maker.cli.main import EXIT_OK, EXIT_REPLAY_MISMATCH, main
+from polymarket_pair_maker.core.config import load_phase1_config
+from polymarket_pair_maker.core.ids import (
     CanonicalEventId,
     CollectorRunId,
     ConnectionId,
@@ -21,9 +21,9 @@ from multi_market_arbitrage.core.ids import (
     SubscriptionId,
     WriterId,
 )
-from multi_market_arbitrage.core.time import MonotonicTimestamp, UtcTimestamp
-from multi_market_arbitrage.ingestion import RawEventEnvelope
-from multi_market_arbitrage.journal import (
+from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
+from polymarket_pair_maker.ingestion import RawEventEnvelope
+from polymarket_pair_maker.journal import (
     JournalCorruptionError,
     JournalDurabilityState,
     JournalReader,
@@ -33,9 +33,9 @@ from multi_market_arbitrage.journal import (
     completion_path_for_run,
     load_run_completion_head,
 )
-from multi_market_arbitrage.normalization import CanonicalEventType
-from multi_market_arbitrage.observability import InMemoryMetrics
-from multi_market_arbitrage.pipeline import (
+from polymarket_pair_maker.normalization import CanonicalEventType
+from polymarket_pair_maker.observability import InMemoryMetrics
+from polymarket_pair_maker.pipeline import (
     CLOB_MARKET_PREFIX,
     CONTROL_BOOK_INVALIDATION,
     CONTROL_REST_AUDIT_START,
@@ -47,31 +47,29 @@ from multi_market_arbitrage.pipeline import (
     AuditOutcome,
     CanonicalProcessor,
 )
-from multi_market_arbitrage.pipeline import observe as observe_module
-from multi_market_arbitrage.pipeline.health import ObservationRuntimeHealth
-from multi_market_arbitrage.pipeline.observe import PolymarketObservationService
-from multi_market_arbitrage.pipeline.processor import ProcessedEnvelope, ReferenceRefreshRequest
-from multi_market_arbitrage.reference import POLYMARKET_VENUE_ID
-from multi_market_arbitrage.replay import (
+from polymarket_pair_maker.pipeline import observe as observe_module
+from polymarket_pair_maker.pipeline.health import ObservationRuntimeHealth
+from polymarket_pair_maker.pipeline.observe import PolymarketObservationService
+from polymarket_pair_maker.pipeline.processor import ProcessedEnvelope, ReferenceRefreshRequest
+from polymarket_pair_maker.reference import POLYMARKET_VENUE_ID
+from polymarket_pair_maker.replay import (
     ReplayTerminalHashMismatch,
     rebuild_analytical_from_journal,
     replay_journal,
     replay_run_ids,
 )
-from multi_market_arbitrage.research import (
+from polymarket_pair_maker.research import (
     Phase1AnalyticalOutputs,
     SupervisedAnalyticalOutputs,
-    build_scan_report,
     validate_data,
 )
-from multi_market_arbitrage.state.order_books import InvalidationReason
-from multi_market_arbitrage.storage import (
+from polymarket_pair_maker.state.order_books import InvalidationReason
+from polymarket_pair_maker.storage import (
     DuckDBReadOnlyQuery,
-    ReadOnlyQueryError,
     analytical_run_completion_path,
     load_analytical_run_completion,
 )
-from multi_market_arbitrage.venues.polymarket import (
+from polymarket_pair_maker.venues.polymarket import (
     PolymarketEndpointClass,
     PolymarketHttpFailureCategory,
     PolymarketHttpTransportError,
@@ -81,7 +79,7 @@ from multi_market_arbitrage.venues.polymarket import (
     PublicReadResult,
     ReceivedWebSocketMessage,
 )
-from multi_market_arbitrage.venues.polymarket.schemas import GammaMarket, parse_gamma_markets
+from polymarket_pair_maker.venues.polymarket.schemas import GammaMarket, parse_gamma_markets
 
 FIXTURES = Path(__file__).parents[1] / "golden" / "fixtures"
 
@@ -718,7 +716,7 @@ async def test_completed_raw_run_rebuilds_deterministic_analytical_outputs_atomi
     assert first_head.source_journal_completion_sha256 == raw_head.completion_sha256
     assert {dataset.dataset: dataset.record_count for dataset in first_head.datasets} == {
         "canonical_events": expected_replay.processor.canonical_events,
-        "complete_set_scans": expected_replay.processor.scans,
+        "book_eligibility": expected_replay.processor.eligibility_assessments,
         "reference": expected_replay.processor.reference_updates,
     }
     assert validate_data(tmp_path / "rebuilt-first").valid
@@ -734,7 +732,7 @@ async def test_analytical_rebuild_failure_publishes_no_destination_or_completion
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from multi_market_arbitrage.storage import analytical as analytical_module
+    from polymarket_pair_maker.storage import analytical as analytical_module
 
     run_id = CollectorRunId("run-derived-rebuild-failure")
     raw_root = tmp_path / "raw"
@@ -894,7 +892,7 @@ async def test_raw_capture_continues_after_derived_parquet_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from multi_market_arbitrage.storage import analytical as analytical_module
+    from polymarket_pair_maker.storage import analytical as analytical_module
 
     def fail_parquet(*args: object, **kwargs: object) -> None:
         del args, kwargs
@@ -968,15 +966,14 @@ def test_analytical_outputs_are_schema_stable_and_reportable(tmp_path: Path) -> 
     outputs.close()
 
     validation = validate_data(tmp_path / "analytical")
-    report = build_scan_report(tmp_path / "analytical")
 
     assert validation.valid
     assert validation.parquet_fragments > 3
-    assert report.total_scans == processor.summary().scans
-    assert report.candidates == processor.summary().candidates
-    assert report.unique_lifecycles == processor.summary().unique_opportunity_lifecycles
-    assert report.unique_opportunity_observations <= report.candidates
-    assert len(report.terminal_hashes) == report.total_scans
+    with DuckDBReadOnlyQuery(tmp_path / "analytical") as query:
+        query.register_parquet_view("eligibility", tmp_path / "analytical" / "book_eligibility")
+        assert query.query("SELECT count(*) FROM eligibility").rows[0][0] == (
+            processor.summary().eligibility_assessments
+        )
 
     bundle = processor.current_bundles[0]
     reference_provenance = processor.reference_provenance(bundle.market.market_id)
@@ -985,16 +982,12 @@ def test_analytical_outputs_are_schema_stable_and_reportable(tmp_path: Path) -> 
     assert {
         item.value for item in reference_provenance.source_ingest_ids
     } == expected_reference_sources
-    final_candidate = next(
-        result.candidate
-        for result in reversed(processor.scan_results)
-        if result.candidate is not None
-    )
+    final_assessment = processor.eligibility_assessments[-1]
     assert expected_reference_sources <= {
-        item.value for item in final_candidate.provenance.source_ingest_ids
+        item.value for item in final_assessment.provenance.source_ingest_ids
     }
     assert set(reference_provenance.source_payload_hashes) <= set(
-        final_candidate.provenance.source_payload_hashes
+        final_assessment.provenance.source_payload_hashes
     )
 
     with DuckDBReadOnlyQuery(tmp_path / "analytical") as query:
@@ -1006,11 +999,12 @@ def test_analytical_outputs_are_schema_stable_and_reportable(tmp_path: Path) -> 
     assert set(json.loads(str(persisted[0]))) == expected_reference_sources
     assert set(json.loads(str(persisted[1]))) == set(reference_provenance.source_payload_hashes)
 
-    scan_fragment = next((tmp_path / "analytical" / "complete_set_scans").rglob("*.parquet"))
-    scan_fragment.with_name(f"{scan_fragment.name}.manifest.json").unlink()
-    scan_fragment.unlink()
-    with pytest.raises(ReadOnlyQueryError, match="refused invalid analytical inventory"):
-        build_scan_report(tmp_path / "analytical")
+    eligibility_fragment = next((tmp_path / "analytical" / "book_eligibility").rglob("*.parquet"))
+    eligibility_fragment.with_name(f"{eligibility_fragment.name}.manifest.json").unlink()
+    eligibility_fragment.unlink()
+    damaged = validate_data(tmp_path / "analytical")
+    assert not damaged.valid
+    assert damaged.errors
 
 
 class _BrokenPublicClient:
@@ -1088,12 +1082,12 @@ async def test_ingress_overflow_is_journaled_and_forces_rest_resnapshot(
                 ingest_seq=envelope.ingest_seq,
                 success=True,
                 canonical_event_count=0,
-                scan_count=0,
+                eligibility_count=0,
                 needs_resync=False,
                 affected_instrument_ids=(),
                 reference_refresh_requests=(),
                 book_freshness_updates=(),
-                scan_triggers=(),
+                eligibility_triggers=(),
                 error_type=None,
             )
 
@@ -1199,8 +1193,8 @@ async def test_ingress_overflow_is_journaled_and_forces_rest_resnapshot(
     assert stream.ingress_metrics.overflows == 1
     assert "bounded application ingress queue exhausted" in stream.deviations
     assert resnapshots == [(selected.gamma_market_id,)]
-    assert counters["mma_ingress_overflows_total"] == 1
-    assert counters["mma_resynchronizations_total"] == 1
+    assert counters["ppm_ingress_overflows_total"] == 1
+    assert counters["ppm_resynchronizations_total"] == 1
     assert runtime_health.snapshot().data_loss_count == 1
     assert runtime_health.snapshot().resyncs == 1
     assert [record.channel for record in records] == [WS_MARKET, CONTROL_BOOK_INVALIDATION]
@@ -1427,7 +1421,7 @@ async def test_continuous_audit_fences_response_without_replacing_socket_generat
     assert live.audit_outcomes[0].reason is AuditFailureReason.HTTP_REQUEST_FAILED
     assert live.terminal_hash == replayed.terminal_hash
     counters = {key.name: value for key, value in metrics.snapshot().counters}
-    assert counters["mma_rest_audit_retries_total"] == 1
+    assert counters["ppm_rest_audit_retries_total"] == 1
     assert runtime_health.snapshot().socket_connected
     assert runtime_health.snapshot().unavailable_intervals == 0
     assert runtime_health.snapshot().reconnects == 0
@@ -1576,8 +1570,8 @@ async def test_unrelated_new_market_is_preserved_without_rotating_selected_socke
     ]
     assert live.reference_refresh_requests == 1
     assert live.terminal_hash == replayed.terminal_hash
-    assert counters["mma_reference_refresh_requests_total"] == 1
-    assert counters["mma_reference_refresh_requests_ignored_total"] == 1
+    assert counters["ppm_reference_refresh_requests_total"] == 1
+    assert counters["ppm_reference_refresh_requests_ignored_total"] == 1
     assert runtime.socket_connected
     assert runtime.unavailable_intervals == 0
     assert runtime.reconnects == 0
@@ -1642,12 +1636,12 @@ async def test_successful_state_invalidation_resync_is_not_a_protocol_deviation(
                     ingest_seq=7,
                     success=True,
                     canonical_event_count=1,
-                    scan_count=1,
+                    eligibility_count=1,
                     needs_resync=True,
                     affected_instrument_ids=(),
                     reference_refresh_requests=(),
                     book_freshness_updates=(),
-                    scan_triggers=(),
+                    eligibility_triggers=(),
                     error_type=None,
                 ),
             )
@@ -1878,8 +1872,8 @@ async def test_refresh_requests_are_selected_market_bounded_and_coalesced(
     assert refreshed == [(selected.gamma_market_id, deadline)]
     assert snapshots == [((selected.gamma_market_id,), deadline, False)]
     counters = {key.name: value for key, value in metrics.snapshot().counters}
-    assert counters["mma_reference_refresh_requests_total"] == 4_096
-    assert counters["mma_reference_refresh_requests_ignored_total"] == 1
+    assert counters["ppm_reference_refresh_requests_total"] == 4_096
+    assert counters["ppm_reference_refresh_requests_ignored_total"] == 1
 
 
 @pytest.mark.asyncio

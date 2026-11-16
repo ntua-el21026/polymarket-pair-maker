@@ -5,15 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from multi_market_arbitrage.core.time import UtcTimestamp
-from multi_market_arbitrage.pipeline.targeting import (
+from polymarket_pair_maker.core.time import UtcTimestamp
+from polymarket_pair_maker.pipeline.targeting import (
     ObservationTargetMode,
     TargetSelectionError,
     require_supported_gamma_market,
     resolve_polymarket_target,
 )
-from multi_market_arbitrage.reference import PolymarketReferenceBuilder
-from multi_market_arbitrage.venues.polymarket.schemas import (
+from polymarket_pair_maker.reference import PolymarketReferenceBuilder
+from polymarket_pair_maker.venues.polymarket.schemas import (
     GammaMarket,
     parse_clob_market_info,
     parse_gamma_markets,

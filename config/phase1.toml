@@ -1,7 +1,7 @@
 [system]
 runtime_role = "OBSERVE"
 queue_capacity = 1024
-code_version = "phase1-v1"
+code_version = "ppm-foundation-v1"
 maximum_observation_duration_seconds = 86400.0
 
 [storage]
@@ -58,13 +58,10 @@ clob_books_requests_per_window = 50
 rate_limit_source_url = "https://docs.polymarket.com/api-reference/rate-limits"
 rate_limit_checked_on = 2026-08-22
 
-[scanner]
+[eligibility]
 enabled = true
 maximum_book_age_seconds = 5.0
 maximum_interleg_skew_seconds = 1.0
-minimum_edge_thresholds = ["0", "0.0025", "0.005", "0.01"]
-quantity_increment = "0.01"
-maximum_capacity_evaluations = 4096
 
 [health]
 checkpoint_interval_seconds = 10.0
