@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import fields, is_dataclass
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from types import UnionType
 from typing import Literal, Union, cast, get_args, get_origin, get_type_hints
@@ -39,6 +40,17 @@ def read_json(path: Path, *, maximum_bytes: int = 8_388_608) -> object:
 
 def decode[T](kind: type[T], value: object) -> T:
     return cast(T, _decode(kind, value, depth=0))
+
+
+@lru_cache(maxsize=128)
+def _schema(kind: type[object]) -> tuple[frozenset[str], dict[str, object]]:
+    """Cache fixed code-selected type metadata, never decoded input or values."""
+    if not is_dataclass(kind):
+        raise TypeError("paper schema metadata requires a dataclass")
+    return (
+        frozenset(field.name for field in fields(kind) if field.init),
+        cast(dict[str, object], get_type_hints(kind)),
+    )
 
 
 def _decode(kind: object, value: object, *, depth: int) -> object:
@@ -110,10 +122,9 @@ def _decode(kind: object, value: object, *, depth: int) -> object:
         if not isinstance(value, dict):
             raise ValueError("expected an object for the declared paper schema")
         mapping = cast(dict[str, object], value)
-        declared = {field.name for field in fields(kind) if field.init}
+        declared, hints = _schema(kind)
         if set(mapping) - declared:
             raise ValueError(f"unknown fields: {sorted(set(mapping) - declared)}")
-        hints = get_type_hints(kind)
         kwargs = {key: _decode(hints[key], item, depth=depth + 1) for key, item in mapping.items()}
         return kind(**kwargs)
     raise TypeError(f"unsupported declared paper input type: {kind}")
