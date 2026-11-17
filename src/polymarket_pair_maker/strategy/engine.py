@@ -9,7 +9,11 @@ from enum import StrEnum
 from polymarket_pair_maker.core.exact import ExactDecimal, Money, Price, Quantity, RoundingMode
 from polymarket_pair_maker.core.health import MarketStatus
 from polymarket_pair_maker.core.ids import InstrumentId, MarketId
-from polymarket_pair_maker.core.serialization import canonical_sha256
+from polymarket_pair_maker.core.serialization import (
+    CanonicalComposed,
+    canonical_json_bytes,
+    canonical_sha256,
+)
 from polymarket_pair_maker.core.time import UtcTimestamp
 from polymarket_pair_maker.economics.fees import FeeRules, canonical_fee_reasons, execution_fee
 from polymarket_pair_maker.economics.rewards import RewardRules
@@ -128,7 +132,7 @@ class StrategyConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class MarketContext:
+class MarketContext(CanonicalComposed):
     bundle: ReferenceBundle
     assessment: BinaryBookEligibilityAssessment
     yes_book: ImmutableOrderBookSnapshot
@@ -557,13 +561,79 @@ class DecisionEngine:
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
         self.config = StrategyConfig() if config is None else config
-        self._cache: OrderedDict[str, CandidateEvaluation] = OrderedDict()
+        self._cache: OrderedDict[tuple[Candidate, str], CandidateEvaluation] = OrderedDict()
+        self._candidate_cache: OrderedDict[tuple[object, ...], tuple[Candidate, ...]] = (
+            OrderedDict()
+        )
         self.cache_hits = 0
         self.cache_misses = 0
+        self.candidate_cache_hits = 0
+        self.candidate_cache_misses = 0
+        self.context_cache_hits = 0
+        self.context_cache_misses = 0
+        self._context_cache: tuple[MarketId, bytes, object, str] | None = None
 
     @property
     def cached_evaluations(self) -> int:
         return len(self._cache)
+
+    @property
+    def cached_candidate_grids(self) -> int:
+        return len(self._candidate_cache)
+
+    def _candidates(self, context: MarketContext) -> tuple[Candidate, ...]:
+        # This pure grid depends only on these immutable values. Admission,
+        # freshness and reference checks run before this method on every call.
+        tick = context.bundle.precision.tick_size
+        quantities = (
+            context.bundle.precision.minimum_order_size,
+            None if context.reward_rules is None else context.reward_rules.minimum_size,
+        )
+        if not (
+            type(self.config.price_offsets_ticks) is tuple
+            and type(self.config.size_multipliers) is tuple
+            and type(context.bundle.market.market_id) is MarketId
+            and type(tick) is ExactDecimal
+            and type(tick.coefficient) is int
+            and type(tick.scale) is int
+            and all(
+                type(quantity) is Quantity
+                and type(quantity.value) is ExactDecimal
+                and type(quantity.value.coefficient) is int
+                and type(quantity.value.scale) is int
+                for quantity in quantities
+            )
+            and all(book.canonical_cache_eligible() for book in (context.yes_book, context.no_book))
+        ):
+            self.candidate_cache_misses += 1
+            return generate_candidates(context, self.config)
+        key = (
+            context.bundle.market.market_id,
+            context.bundle.precision.tick_size,
+            context.bundle.precision.minimum_order_size,
+            None if context.reward_rules is None else context.reward_rules.minimum_size,
+            self.config.price_offsets_ticks,
+            self.config.size_multipliers,
+            context.yes_book.instrument_id,
+            None if context.yes_book.best_bid is None else context.yes_book.best_bid.price,
+            None if context.yes_book.best_ask is None else context.yes_book.best_ask.price,
+            context.no_book.instrument_id,
+            None if context.no_book.best_bid is None else context.no_book.best_bid.price,
+            None if context.no_book.best_ask is None else context.no_book.best_ask.price,
+        )
+        while len(self._candidate_cache) > self.config.maximum_markets:
+            self._candidate_cache.popitem(last=False)
+        cached = self._candidate_cache.get(key)
+        if cached is not None:
+            self.candidate_cache_hits += 1
+            self._candidate_cache.move_to_end(key)
+            return cached
+        self.candidate_cache_misses += 1
+        result = generate_candidates(context, self.config)
+        self._candidate_cache[key] = result
+        if len(self._candidate_cache) > self.config.maximum_markets:
+            self._candidate_cache.popitem(last=False)
+        return result
 
     def _cached_evaluation(
         self,
@@ -575,7 +645,9 @@ class DecisionEngine:
     ) -> CandidateEvaluation:
         # Validity, health, source time and age are ALWAYS gated before cache use.
         # Formula inputs include complete reference/calibration content, not only IDs.
-        key = canonical_sha256((candidate, context_hash))
+        # Internal lookup uses full immutable candidate equality, not a second
+        # serialization/hash of its already established canonical identity.
+        key = (candidate, context_hash)
         if key in self._cache:
             self.cache_hits += 1
             self._cache.move_to_end(key)
@@ -587,6 +659,36 @@ class DecisionEngine:
             self._cache.popitem(last=False)
         return value
 
+    def _evaluation_context_hash(self, context: MarketContext) -> str:
+        sides = tuple((book.bids, book.asks) for book in (context.yes_book, context.no_book))
+        inputs = (
+            self.config,
+            context.fee_rules,
+            context.calibration,
+            context.risk_capacity,
+            sides,
+        )
+        # Non-book values are encoded afresh, including malformed mutable data.
+        # Only audited immutable depth may be retained for full-value equality.
+        eligible = (
+            all(book.canonical_cache_eligible() for book in (context.yes_book, context.no_book))
+            and sum(len(side) for pair in sides for side in pair) <= 16_384
+        )
+        if not eligible:
+            self._context_cache = None
+            self.context_cache_misses += 1
+            return canonical_sha256(inputs)
+        nonbook = canonical_json_bytes(inputs[:4])
+        key = (context.bundle.market.market_id, nonbook, sides)
+        previous = self._context_cache
+        if previous is not None and previous[:3] == key:
+            self.context_cache_hits += 1
+            return previous[3]
+        self.context_cache_misses += 1
+        result = canonical_sha256(inputs)
+        self._context_cache = (*key, result) if len(nonbook) <= 65_536 else None
+        return result
+
     def evaluate(
         self, context: MarketContext, current: ActiveQuote | None = None
     ) -> StrategyDecision:
@@ -596,16 +698,8 @@ class DecisionEngine:
             return StrategyDecision(
                 StrategyAction.NO_QUOTE, None, reasons, (), current is not None, False, input_hash
             )
-        candidates = generate_candidates(context, self.config)
-        context_hash = canonical_sha256(
-            (
-                self.config,
-                context.fee_rules,
-                context.calibration,
-                context.risk_capacity,
-                tuple((book.bids, book.asks) for book in (context.yes_book, context.no_book)),
-            )
-        )
+        candidates = self._candidates(context)
+        context_hash = self._evaluation_context_hash(context)
         exit_depth = (
             sum((level.quantity.value for level in context.yes_book.bids), ZERO),
             sum((level.quantity.value for level in context.no_book.bids), ZERO),
