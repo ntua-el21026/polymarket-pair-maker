@@ -19,8 +19,12 @@ from polymarket_pair_maker.core.serialization import canonical_json_bytes, canon
 from polymarket_pair_maker.journal import DEFAULT_MAX_UNCOMPRESSED_RUN_BYTES
 from polymarket_pair_maker.journal.recovery import atomic_write_bytes, fsync_directory
 
-CALIBRATION_SCHEMA_VERSION = "ppm-pre-soak-calibration-v1"
-CALIBRATION_BINDINGS_VERSION = "phase1-pre-soak-calibration-bindings-v1"
+# Historical v1 reports omit availability projection and retain that meaning.
+# No reader migrates or relabels their bytes as the current complete contract.
+LEGACY_CALIBRATION_SCHEMA_VERSION = "ppm-pre-soak-calibration-v1"
+LEGACY_CALIBRATION_BINDINGS_VERSION = "phase1-pre-soak-calibration-bindings-v1"
+CALIBRATION_SCHEMA_VERSION = "ppm-pre-soak-calibration-v2"
+CALIBRATION_BINDINGS_VERSION = "phase1-pre-soak-calibration-bindings-v2"
 GATE1_PROJECTION_SECONDS = 21_600
 DEFAULT_HEADROOM_BASIS_POINTS = 20_000  # 2.0x measured workload.
 DEFAULT_DISK_SAFETY_BASIS_POINTS = 2_500  # Additional 25% after all workloads.
@@ -38,12 +42,17 @@ class CalibrationDecisionReason(StrEnum):
     JOURNAL_QUEUE_NEAR_CAPACITY = "JOURNAL_QUEUE_NEAR_CAPACITY"
     ANALYTICAL_QUEUE_NEAR_CAPACITY = "ANALYTICAL_QUEUE_NEAR_CAPACITY"
     HEALTH_QUEUE_NEAR_CAPACITY = "HEALTH_QUEUE_NEAR_CAPACITY"
+    AVAILABILITY_QUEUE_NEAR_CAPACITY = "AVAILABILITY_QUEUE_NEAR_CAPACITY"
     HEALTH_CHECKPOINT_COUNT_LIMIT_THREATENED = "HEALTH_CHECKPOINT_COUNT_LIMIT_THREATENED"
     HEALTH_FILE_LIMIT_THREATENED = "HEALTH_FILE_LIMIT_THREATENED"
+    AVAILABILITY_INTERVAL_COUNT_LIMIT_THREATENED = "AVAILABILITY_INTERVAL_COUNT_LIMIT_THREATENED"
+    AVAILABILITY_FILE_LIMIT_THREATENED = "AVAILABILITY_FILE_LIMIT_THREATENED"
+    AVAILABILITY_EVIDENCE_INCONSISTENT = "AVAILABILITY_EVIDENCE_INCONSISTENT"
     INGESTION_LOSS = "INGESTION_LOSS"
     JOURNAL_FAILURE = "JOURNAL_FAILURE"
     ANALYTICAL_FAILURE = "ANALYTICAL_FAILURE"
     HEALTH_WRITER_FAILURE = "HEALTH_WRITER_FAILURE"
+    AVAILABILITY_WRITER_FAILURE = "AVAILABILITY_WRITER_FAILURE"
     CAPTURE_UNHEALTHY = "CAPTURE_UNHEALTHY"
     RESEARCH_INELIGIBLE = "RESEARCH_INELIGIBLE"
     GATE1_INELIGIBLE = "GATE1_INELIGIBLE"
@@ -288,6 +297,11 @@ class CalibrationMeasurements:
     peak_rss_bytes: int
     analytical_bytes: int
     health_bytes: int
+    availability_bytes: int
+    availability_intervals_accepted: int
+    availability_intervals_written: int
+    availability_intervals_rejected: int
+    availability_writer_failure_count: int
     log_bytes: int
     log_storage_model: str
     artifacts_created: int
@@ -303,6 +317,17 @@ class CalibrationMeasurements:
     def __post_init__(self) -> None:
         if self.actual_duration_ns <= 0:
             raise ValueError("calibration duration must be positive")
+        availability_counts = (
+            self.availability_bytes,
+            self.availability_intervals_accepted,
+            self.availability_intervals_written,
+            self.availability_intervals_rejected,
+            self.availability_writer_failure_count,
+        )
+        if any(type(value) is not int or value < 0 for value in availability_counts):
+            raise ValueError(
+                "calibration availability measurements must be known non-negative integers"
+            )
         counts = (
             self.websocket_messages,
             self.websocket_bytes,
@@ -342,6 +367,8 @@ class CalibrationMeasurements:
         ):
             raise ValueError("calibration eligibility dispositions must be unique and sorted")
         queue_names = tuple(item.name for item in self.queues)
+        if "availability" not in queue_names:
+            raise ValueError("calibration requires availability queue evidence")
         if queue_names != tuple(sorted(queue_names)) or len(set(queue_names)) != len(queue_names):
             raise ValueError("calibration queue measurements must be unique and sorted")
 
@@ -353,6 +380,11 @@ class CalibrationMeasurements:
         return {
             "actual_duration_ns": self.actual_duration_ns,
             "analytical_bytes": self.analytical_bytes,
+            "availability_bytes": self.availability_bytes,
+            "availability_intervals_accepted": self.availability_intervals_accepted,
+            "availability_intervals_written": self.availability_intervals_written,
+            "availability_intervals_rejected": self.availability_intervals_rejected,
+            "availability_writer_failure_count": self.availability_writer_failure_count,
             "analytical_failure_count": self.analytical_failure_count,
             "artifacts_created": self.artifacts_created,
             "audit": {
@@ -403,6 +435,8 @@ class CalibrationLimits:
     health_checkpoint_interval_nanoseconds: int = 10_000_000_000
     health_maximum_checkpoints: int = 8_192
     health_maximum_file_bytes: int = 64 * 1024 * 1024
+    availability_maximum_intervals: int = 8_192
+    availability_maximum_file_bytes: int = 64 * 1024 * 1024
     artifact_path_limit: int = MAX_ARTIFACT_PATHS_PER_ROOT
     headroom_basis_points: int = DEFAULT_HEADROOM_BASIS_POINTS
     disk_safety_basis_points: int = DEFAULT_DISK_SAFETY_BASIS_POINTS
@@ -417,6 +451,8 @@ class CalibrationLimits:
             self.health_checkpoint_interval_nanoseconds,
             self.health_maximum_checkpoints,
             self.health_maximum_file_bytes,
+            self.availability_maximum_intervals,
+            self.availability_maximum_file_bytes,
         )
         if any(value <= 0 for value in positive):
             raise ValueError("calibration limits must be positive")
@@ -432,6 +468,8 @@ class CalibrationLimits:
     def to_record(self) -> dict[str, object]:
         return {
             "artifact_path_limit": self.artifact_path_limit,
+            "availability_maximum_intervals": self.availability_maximum_intervals,
+            "availability_maximum_file_bytes": self.availability_maximum_file_bytes,
             "disk_safety_basis_points": self.disk_safety_basis_points,
             "free_disk_bytes": self.free_disk_bytes,
             "headroom_basis_points": self.headroom_basis_points,
@@ -460,6 +498,8 @@ class CalibrationProjection:
     analytical_bytes: int
     health_bytes: int
     health_checkpoints: int
+    availability_bytes: int
+    availability_intervals: int
     log_bytes: int
     temporary_sealing_bytes: int
     replay_rebuild_bytes: int
@@ -472,6 +512,8 @@ class CalibrationProjection:
         return {
             "analytical_bytes": self.analytical_bytes,
             "artifact_paths": self.artifact_paths,
+            "availability_bytes": self.availability_bytes,
+            "availability_intervals": self.availability_intervals,
             "canonical_events": self.canonical_events,
             "disk_safety_bytes": self.disk_safety_bytes,
             "durable_raw_records": self.durable_raw_records,
@@ -624,6 +666,7 @@ def project_measurement(
 def _queue_reason(name: str) -> CalibrationDecisionReason | None:
     return {
         "analytical": CalibrationDecisionReason.ANALYTICAL_QUEUE_NEAR_CAPACITY,
+        "availability": CalibrationDecisionReason.AVAILABILITY_QUEUE_NEAR_CAPACITY,
         "health": CalibrationDecisionReason.HEALTH_QUEUE_NEAR_CAPACITY,
         "ingress": CalibrationDecisionReason.INGRESS_QUEUE_NEAR_CAPACITY,
         "journal": CalibrationDecisionReason.JOURNAL_QUEUE_NEAR_CAPACITY,
@@ -659,6 +702,8 @@ def build_calibration_report(
     artifact_paths = measurements.existing_artifact_paths + projected_created_paths
     analytical_bytes = projection(measurements.analytical_bytes)
     health_bytes = projection(measurements.health_bytes)
+    availability_bytes = projection(measurements.availability_bytes)
+    availability_intervals = projection(measurements.availability_intervals_written)
     health_checkpoints = (
         _ceil_div(
             GATE1_PROJECTION_SECONDS * 1_000_000_000,
@@ -673,6 +718,7 @@ def build_calibration_report(
         raw_bytes
         + analytical_bytes
         + health_bytes
+        + availability_bytes
         + log_bytes
         + temporary_sealing_bytes
         + replay_rebuild_bytes
@@ -698,6 +744,8 @@ def build_calibration_report(
         analytical_bytes=analytical_bytes,
         health_bytes=health_bytes,
         health_checkpoints=health_checkpoints,
+        availability_bytes=availability_bytes,
+        availability_intervals=availability_intervals,
         log_bytes=log_bytes,
         temporary_sealing_bytes=temporary_sealing_bytes,
         replay_rebuild_bytes=replay_rebuild_bytes,
@@ -718,6 +766,19 @@ def build_calibration_report(
         reasons.add(CalibrationDecisionReason.HEALTH_CHECKPOINT_COUNT_LIMIT_THREATENED)
     if health_bytes >= limits.health_maximum_file_bytes:
         reasons.add(CalibrationDecisionReason.HEALTH_FILE_LIMIT_THREATENED)
+    if availability_bytes >= limits.availability_maximum_file_bytes:
+        reasons.add(CalibrationDecisionReason.AVAILABILITY_FILE_LIMIT_THREATENED)
+    if availability_intervals >= limits.availability_maximum_intervals:
+        reasons.add(CalibrationDecisionReason.AVAILABILITY_INTERVAL_COUNT_LIMIT_THREATENED)
+    if (
+        measurements.availability_intervals_accepted != measurements.availability_intervals_written
+        or measurements.availability_intervals_rejected
+        or bool(measurements.availability_bytes)
+        != bool(measurements.availability_intervals_written)
+    ):
+        reasons.add(CalibrationDecisionReason.AVAILABILITY_EVIDENCE_INCONSISTENT)
+    if measurements.availability_writer_failure_count:
+        reasons.add(CalibrationDecisionReason.AVAILABILITY_WRITER_FAILURE)
     for queue in measurements.queues:
         if queue.threatened and (reason := _queue_reason(queue.name)) is not None:
             reasons.add(reason)
@@ -758,6 +819,7 @@ def render_calibration_markdown(report: CalibrationReport) -> str:
             "",
             f"- Decision: **{decision}**",
             f"- Reasons: {reasons}",
+            f"- Report schema: `{report.schema_version}`",
             f"- Report SHA-256: `{report.report_sha256}`",
             f"- Git commit: `{report.identity.git_commit}`",
             f"- Config SHA-256: `{report.identity.config_sha256}`",
@@ -782,6 +844,13 @@ def render_calibration_markdown(report: CalibrationReport) -> str:
             f"- Health-checkpoint count bound: {report.limits.health_maximum_checkpoints}",
             f"- Projected health evidence: {projection.health_bytes} bytes",
             f"- Health-evidence file bound: {report.limits.health_maximum_file_bytes} bytes",
+            f"- Projected availability intervals: {projection.availability_intervals}",
+            f"- Availability-interval bound: {report.limits.availability_maximum_intervals}",
+            f"- Projected availability evidence: {projection.availability_bytes} bytes",
+            (
+                "- Availability-evidence file bound: "
+                f"{report.limits.availability_maximum_file_bytes} bytes"
+            ),
             (
                 f"- Log storage model: `{measurement.log_storage_model}` "
                 f"({measurement.log_bytes} managed bytes)"
@@ -863,6 +932,8 @@ __all__ = [
     "DEFAULT_DISK_SAFETY_BASIS_POINTS",
     "DEFAULT_HEADROOM_BASIS_POINTS",
     "GATE1_PROJECTION_SECONDS",
+    "LEGACY_CALIBRATION_BINDINGS_VERSION",
+    "LEGACY_CALIBRATION_SCHEMA_VERSION",
     "QUEUE_THREAT_BASIS_POINTS",
     "STDIO_STREAM_LOG_STORAGE_MODEL",
     "BoundedTreeUsage",

@@ -96,6 +96,7 @@ def _measurements() -> CalibrationMeasurements:
         ),
         queues=(
             CalibrationQueueMeasurement("analytical", 4, 64),
+            CalibrationQueueMeasurement("availability", 1, 64),
             CalibrationQueueMeasurement("health", 1, 64),
             CalibrationQueueMeasurement("ingress", 2, 1024),
             CalibrationQueueMeasurement("journal", 3, 1024),
@@ -116,6 +117,11 @@ def _measurements() -> CalibrationMeasurements:
         peak_rss_bytes=128 * 1024 * 1024,
         analytical_bytes=500_000,
         health_bytes=50_000,
+        availability_bytes=0,
+        availability_intervals_accepted=0,
+        availability_intervals_written=0,
+        availability_intervals_rejected=0,
+        availability_writer_failure_count=0,
         log_bytes=0,
         log_storage_model=STDIO_STREAM_LOG_STORAGE_MODEL,
         artifacts_created=15,
@@ -263,7 +269,7 @@ def test_calibration_binds_health_bounds_and_stdio_stream_log_model() -> None:
     measurement_record = report.measurements.to_record()
     limits_record = report.limits.to_record()
     queue_record = report.measurements.queues[0].to_record()
-    assert report.schema_version == "ppm-pre-soak-calibration-v1"
+    assert report.schema_version == "ppm-pre-soak-calibration-v2"
     assert measurement_record["log_bytes"] == 0
     assert measurement_record["log_storage_model"] == STDIO_STREAM_LOG_STORAGE_MODEL
     assert measurement_record["journal_commit_to_durable"] == {

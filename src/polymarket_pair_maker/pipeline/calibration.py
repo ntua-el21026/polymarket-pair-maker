@@ -364,6 +364,11 @@ def _measurement(
                 config.storage.analytical_queue_capacity,
             ),
             CalibrationQueueMeasurement(
+                "availability",
+                summary.availability_evidence.queue_high_water,
+                config.health.availability_queue_capacity,
+            ),
+            CalibrationQueueMeasurement(
                 "health",
                 summary.health_evidence.queue_high_water,
                 config.health.queue_capacity,
@@ -389,6 +394,15 @@ def _measurement(
         peak_rss_bytes=peak_rss_bytes,
         analytical_bytes=analytical_delta.bytes,
         health_bytes=summary.health_evidence.file_bytes,
+        availability_bytes=summary.availability_evidence.file_bytes,
+        availability_intervals_accepted=summary.availability_evidence.accepted,
+        availability_intervals_written=summary.availability_evidence.written,
+        availability_intervals_rejected=summary.availability_evidence.rejected,
+        availability_writer_failure_count=int(
+            not summary.availability_evidence.completed
+            or not summary.availability_evidence.gate1_evidence_eligible
+            or summary.availability_evidence.failure_type is not None
+        ),
         log_bytes=0,
         log_storage_model=STDIO_STREAM_LOG_STORAGE_MODEL,
         artifacts_created=storage_delta.regular_files,
@@ -501,6 +515,8 @@ async def run_polymarket_calibration(
         ),
         health_maximum_checkpoints=config.health.maximum_checkpoints,
         health_maximum_file_bytes=config.health.maximum_file_bytes,
+        availability_maximum_intervals=config.health.maximum_availability_intervals,
+        availability_maximum_file_bytes=config.health.maximum_availability_file_bytes,
     )
     report = build_calibration_report(identity, measurements, limits)
     artifacts = await asyncio.to_thread(
