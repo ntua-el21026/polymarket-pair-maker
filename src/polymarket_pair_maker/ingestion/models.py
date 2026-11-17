@@ -22,7 +22,11 @@ from polymarket_pair_maker.core.ids import (
     VenueId,
     is_sha256_hex,
 )
-from polymarket_pair_maker.core.serialization import canonical_json_bytes
+from polymarket_pair_maker.core.serialization import (
+    DuplicateJsonFieldError,
+    canonical_json_bytes,
+    unique_json_object,
+)
 from polymarket_pair_maker.core.time import MonotonicTimestamp, UtcTimestamp
 
 RAW_EVENT_FORMAT_VERSION: Final = "raw-event-envelope-v1"
@@ -253,7 +257,11 @@ class RawEventEnvelope:
 
         raw = line[:-1] if line.endswith(b"\n") else line
         try:
-            decoded = json.loads(raw)
+            decoded = json.loads(raw, object_pairs_hook=unique_json_object)
+        except DuplicateJsonFieldError as exc:
+            raise RawEnvelopeValidationError(
+                "journal record contains a duplicate JSON field"
+            ) from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise RawEnvelopeValidationError("journal record is not valid UTF-8 JSON") from exc
         if not isinstance(decoded, dict):

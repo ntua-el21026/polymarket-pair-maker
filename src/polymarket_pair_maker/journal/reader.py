@@ -13,6 +13,7 @@ from typing import cast
 import zstandard
 
 from polymarket_pair_maker.core.ids import CollectorRunId
+from polymarket_pair_maker.core.serialization import DuplicateJsonFieldError, unique_json_object
 from polymarket_pair_maker.ingestion import RawEnvelopeValidationError, RawEventEnvelope
 
 from .models import (
@@ -76,7 +77,9 @@ def load_segment_manifest(path: Path) -> SegmentManifest:
             content = handle.read(_MAX_MANIFEST_BYTES + 1)
         if len(content) > _MAX_MANIFEST_BYTES:
             raise JournalCorruptionError(f"segment manifest exceeds byte limit: {path}")
-        raw = json.loads(content)
+        raw = json.loads(content, object_pairs_hook=unique_json_object)
+    except DuplicateJsonFieldError as exc:
+        raise JournalCorruptionError(f"duplicate JSON field in segment manifest: {path}") from exc
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise JournalCorruptionError(f"cannot decode segment manifest: {path}") from exc
     return SegmentManifest.from_record(raw)
@@ -90,7 +93,11 @@ def load_run_completion_head(path: Path) -> RunCompletionHead:
             content = handle.read(_MAX_MANIFEST_BYTES + 1)
         if len(content) > _MAX_MANIFEST_BYTES:
             raise JournalCorruptionError(f"journal run completion exceeds byte limit: {path}")
-        raw = json.loads(content)
+        raw = json.loads(content, object_pairs_hook=unique_json_object)
+    except DuplicateJsonFieldError as exc:
+        raise JournalCorruptionError(
+            f"duplicate JSON field in journal run completion: {path}"
+        ) from exc
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise JournalCorruptionError(f"cannot decode journal run completion: {path}") from exc
     return RunCompletionHead.from_record(raw)

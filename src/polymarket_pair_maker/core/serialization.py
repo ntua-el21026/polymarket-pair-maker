@@ -24,6 +24,20 @@ class CanonicalSerializationError(TypeError):
     """Raised when an object cannot be serialized without hidden semantics."""
 
 
+class DuplicateJsonFieldError(ValueError):
+    """A JSON object contains a repeated field, even if its values agree."""
+
+
+def unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate fields before a JSON decoder discards their identity."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateJsonFieldError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
 def canonicalize(value: object, *, allow_floats: bool = False) -> CanonicalValue:
     """Convert supported values to deterministic JSON-compatible values.
 
@@ -97,8 +111,10 @@ def canonical_sha256(value: object, *, allow_floats: bool = False) -> str:
 __all__ = [
     "CanonicalSerializationError",
     "CanonicalValue",
+    "DuplicateJsonFieldError",
     "canonical_json_bytes",
     "canonical_json_string",
     "canonical_sha256",
     "canonicalize",
+    "unique_json_object",
 ]
