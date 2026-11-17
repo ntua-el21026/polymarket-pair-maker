@@ -31,3 +31,12 @@ preserved under [historical/](historical/README.md). The migration does not run 
 new six-hour soak; Task 2 also does not initiate one. No step automatically authorizes live
 execution. Legal/geographic eligibility and a future live-capable task remain
 separate unresolved gates.
+
+Tasks 4–5 remediated normalized artifact capacity and the original synthetic
+performance screens. Task 6 adds a separately measured 120 records/s target,
+current official-source verification, bounded historical-data recovery and an
+offline calibration-readiness contract. The original collector corpus and
+authoritative rule gaps still block empirical research. A future Task 7 economic
+evaluation requires qualified real data, resolved applicable venue rules,
+independent execution calibration and frozen confirmation evidence. Synthetic
+engineering completion does not satisfy these prerequisites.

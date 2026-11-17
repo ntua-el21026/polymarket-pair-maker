@@ -222,3 +222,19 @@ and canonical encoding reuse preserve existing bytes and hash domains. Candidate
 generation and evaluation caches retain complete immutable keys with explicit
 bounds. Every decision still checks current data, references and calibration.
 The Task 4 v2 artifact format, verification and publication contract is retained.
+
+Task 6 adds two narrowly scoped pure optimizations under
+[ADR-0006](ADR/0006-causal-readiness-and-exact-subset-composition.md): two exact
+immutable bid-total cells per engine, and strict economic-subset byte composition
+within the existing owner memo/sequence proof bounds. No economic state is shared.
+
+## Offline execution-calibration readiness
+
+`research/calibration_readiness.py` wraps existing typed observations with declared
+multi-market source, parent/category, execution attribution and terminal-exposure
+provenance. It reuses the strict code-selected decoder, validates chronology and
+scope, and atomically publishes a deterministic fresh report. It is network-free
+and independent of paper admission and the existing estimator. Complete-day
+splits, embargoes, missing horizons and descriptive support are documented in
+[CALIBRATION_READINESS.md](CALIBRATION_READINESS.md). Declared hashes/statuses do
+not authenticate upstream evidence; readiness requires independent review.

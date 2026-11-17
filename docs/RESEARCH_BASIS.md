@@ -125,3 +125,22 @@ no eligibility conclusion. A venue geoblock response cannot replace applicable
 local-law assessment; live capability requires explicit authorization, verified
 eligibility and separate acceptance. Research/observation remain limited to
 permitted activity.
+
+## Task 6 scoped re-verification
+
+On 2026-11-17 the required international official pages and pinned SDK/exchange
+sources were captured again with exact bodies, revisions, retrieval times, sizes
+and hashes in the external Task 6 source manifest. The seven required current
+documentation bodies match the Task 3 captures. A pre-registered ordinary binary
+candidate (Gamma 703257) was inspected through bounded reference reads; the actual
+collector `/clob-markets/{condition}` schema agrees with Gamma on rate 0.04,
+exponent 1 and taker-only fees. Legacy fee-rate fields remain uninterpreted.
+No active daily reward allocation was established. Current reference shape and
+numerical agreement do not establish historical applicability or exact settlement.
+
+The adjusted-midpoint construction, fee ties/partial-fill settlement and asset
+denomination, deployment bindings, reward minimum-age field and effective
+intervals remain unresolved. The synthetic midpoint convention remains barred
+for real-market admission. The external source/rule matrix identifies each
+supported claim and precise missing authority; its support inquiry is a draft
+that has not been sent. No fee, midpoint, reward or settlement default changed.

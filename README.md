@@ -25,6 +25,7 @@ unavailable.
 | [Strategy specification](docs/STRATEGY_SPEC.md) | Implemented strategy and empirical prerequisites |
 | [Research basis](docs/RESEARCH_BASIS.md) | Sources, findings, and implementation consequences |
 | [Validation gates](docs/VALIDATION_GATES.md) | Migration, implementation, and independent acceptance |
+| [Calibration readiness](docs/CALIBRATION_READINESS.md) | Offline causal support checks and explicit evidence limits |
 | [Roadmap](docs/ROADMAP.md) | The agreed three-task sequence |
 | [Paper decisions](docs/ADR/0002-paper-economics-and-simulation.md) | Economic uncertainty and simulation contracts |
 | [SDK decision](docs/ADR/0003-defer-official-sdk.md) | Retained public transport and deferred SDK |
@@ -166,3 +167,25 @@ Legacy v1 completed results retain their original interpretation and container
 hash checks. Their absent cross-stream record indices prevent independent
 reconstruction of historical state-chain order; the verifier reports that limit.
 Raw evidence and historical artifact files are never migrated in place.
+
+## Task 6 research readiness
+
+Typed offline readiness checks now preserve market/parent/day grouping, explicit
+execution attribution, quote-as-of references, terminal exposure, censoring and
+the four required markout horizons. They prepare independent review without
+fitting a calibration or qualifying declared source labels. See the
+[contract and offline command](docs/CALIBRATION_READINESS.md).
+
+Task 6 rechecked current official sources and the actual collector reference
+schema for one ordinary binary market. Midpoint and exact settlement authority
+remain incomplete. The bounded historical search did not recover the original
+failed-run corpus. Collector Gate 1 remains FAIL; venue rules remain BLOCKED;
+execution calibration and empirical profitability remain INSUFFICIENT_EVIDENCE.
+
+Measured exact-computation reuse is described in
+[ADR-0006](docs/ADR/0006-causal-readiness-and-exact-subset-composition.md).
+The new 120 records/s internal target requires three complete frozen-source
+formal attempts at every depth, separately from the original 100 records/s gate.
+The external Task 6 handoff records all measured outcomes; synthetic replay
+capacity does not establish production headroom or economic viability. No new
+collection or support contact was initiated; both next-step requests are drafts.

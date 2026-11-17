@@ -173,3 +173,32 @@ scenarios, three warmups, the timed fourth replay and required verification. The
 100 records/s, latency, memory, 300-second child deadline and artifact bounds above
 continue to apply. A faster incomplete or failed workload cannot pass. Synthetic
 qualification and representative production qualification remain separate.
+
+## Task 6 — External evidence and repeated internal throughput target
+
+Retain every original Gate C criterion. Source retrieval and reference-schema
+compatibility do not qualify a market when effective rules remain unresolved.
+Bounded offline recovery does not replace the failed-run corpus or authorize a
+new collection. A requested future collector run remains AWAITING_AUTHORIZATION
+and must preserve the original remediation prerequisites and acceptance standard.
+
+The offline [readiness layer](CALIBRATION_READINESS.md) validates declared
+provenance, market/protocol/parent scope, known/effective references, terminal
+exposure and chronological support. Observed, L2-inferred and synthetic fills
+remain distinct. Its READY_FOR_INDEPENDENT_REVIEW status is not Gate D acceptance;
+missing real evidence means INSUFFICIENT_EVIDENCE and unavailable empirical periods.
+
+Separately freeze the new internal target: at least three independent valid
+complete formal attempts at one source revision; all 6/100/1000-level timed
+replays in all attempts must reach 120 raw records/s (1,004/120 seconds maximum).
+Retain every valid observation and report minimum/median/maximum and host load.
+Preserve the original 100 records/s screen, 14-case matrix, 9/25/49 grids, three
+scenarios, 1,004 raw/2,000 canonical records, three warmups and timed fourth replay,
+300-second child/900-second matrix deadlines, 512 MiB retained matrix output,
+2 GiB RSS, 64 MiB comparable growth, latency screens and 256 MiB per-run bound.
+Every required phase stays timed. Diagnostic profiles/pilots remain separate.
+
+Historical collector Gate 1 remains FAIL. Venue qualification remains BLOCKED;
+execution calibration and empirical economic viability remain
+INSUFFICIENT_EVIDENCE. Synthetic performance cannot qualify representative
+production throughput or authorize live execution.
