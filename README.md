@@ -200,3 +200,12 @@ sent body has been independently read. No duplicate contact was made. The
 [prospective collector preflight](docs/COLLECTOR_PREFLIGHT.md) prepares a separately
 identified run while retaining historical Gate 1 FAIL. No smoke, calibration,
 stability observation or soak is authorized by offline readiness.
+
+Task 7B records owner approval of that prospective lineage and conditional
+approval of exactly one 60-second public observer smoke for Gamma 703257. The
+mandatory access-scope preflight stopped before fresh market requests or
+collection: current terms broadly restrict automated extraction, while public
+API documentation does not expressly resolve permission for this retained
+research capture. The smoke is **NOT RUN / BLOCKED**, rather than an executed
+failure. See the [Task 7B assessment](docs/TASK7B_PREFLIGHT.md). No later stage is
+authorized, and profitability remains NO-GO.

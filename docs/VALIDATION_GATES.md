@@ -232,6 +232,13 @@ original two corrected failed-run replays, erase historical Gate 1 FAIL, or
 recover missing causal evidence. Any later prospective qualification must be
 reported independently under the retained standard.
 
+Task 7B records prospective-lineage approval and a conditionally approved first
+60-second smoke. Mandatory access-scope review stopped before fresh market
+references or collection. The smoke is NOT RUN / BLOCKED PREFLIGHT, not a failed
+executed run or a passing collector gate. See [TASK7B_PREFLIGHT.md](TASK7B_PREFLIGHT.md)
+for source evidence, unchanged historical/empirical verdicts and the precise
+external dependency. No subsequent stage is authorized.
+
 The owner reports a technical support inquiry sent on 2026-11-17; the response
 remains pending. Venue rules, qualified historical/operational evidence, actual
 execution calibration, empirical economics and representative production

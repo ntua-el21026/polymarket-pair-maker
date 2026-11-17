@@ -1,7 +1,12 @@
 # Prospective collector preflight
 
-Task 7A prepares an offline, reviewable next step. **No collection stage is
-authorized or executed.** The first historical six-hour run remains
+Task 7A prepared an offline, reviewable next step. Task 7B records owner approval
+of the new prospective lineage and conditional approval of exactly one
+60-second Gamma 703257 smoke under the reviewed supervision policy. Its mandatory
+access-scope preflight is **BLOCKED**; fresh market requests and the smoke remain
+**NOT RUN**. No later stage is authorized. The
+[current assessment](TASK7B_PREFLIGHT.md) distinguishes approval from satisfied
+execution conditions. The first historical six-hour run remains
 `GATE 1: FAIL`; its absent complete corpus has not been replayed under corrected
 code. Both required corrected historical replays remain **UNSATISFIED**.
 
@@ -12,7 +17,8 @@ configuration. The original Task 3–6 evidence remains read-only.
 
 ## Decisions before the first stage
 
-Two owner decisions remain separate:
+Two owner decisions remain separate; the owner approved both in Task 7B, with
+the second conditional on every mandatory preflight gate passing:
 
 1. Approve a prospective research programme despite the unavailable historical
    corpus, with a new lineage and the original failure and unsatisfied historical
@@ -37,7 +43,8 @@ The retained sequence is fixed:
 | Stability observation | 2,700 s | `observe polymarket` | Independent pre-soak review and separate authorization |
 | Six-hour qualification | 21,600 s | `observe polymarket` | Unchanged evidence and acceptance requirements |
 
-Every stage is currently `AWAITING_AUTHORIZATION`. No automatic transition,
+The first smoke is `CONDITIONALLY_APPROVED_PREFLIGHT_BLOCKED`; later stages are
+`AWAITING_AUTHORIZATION`. No automatic transition,
 restart, target substitution, duration extension or limit increase is allowed.
 
 ## Freeze source, environment and storage
@@ -196,14 +203,19 @@ interpret this zero as zero disk for externally retained stdout/stderr.
 Actual arrival rate, growth, CPU, RSS slope, latency and queue pressure remain
 unknown. No storage/capacity projection has been executed on new market data.
 
-## Launch recipe: NOT RUN
+## Task 7A launch recipe: NOT RUN
 
 The external evidence supplies `configs/smoke-a01.toml`, an unapproved
 `smoke-authorization.template.json`, and `run_smoke.py`. The default `--check`
 only verifies local bindings/review references; it never invokes the observer.
 It does not adjudicate the content or authority of a human decision.
 
-The exact prospective CLI is shown below. It is **NOT RUN and NOT AUTHORIZED**.
+The exact prospective CLI is shown below. It remains **NOT RUN**. The historical
+template remains unapproved and unchanged; Task 7B owner approval is recorded
+separately, with activation withheld because access and fresh-reference gates
+are unsatisfied. A later source-changing documentation commit also invalidates
+the sealed recipe's exact-source gate; do not edit sealed bindings or claim
+that the old command qualifies a different SHA.
 The external bounded launcher owns stdout/stderr; do not replace it with
 unbounded shell redirection. `--offline --no-sync` prevents dependency setup;
 it does not prevent the authorized application from contacting public services.
