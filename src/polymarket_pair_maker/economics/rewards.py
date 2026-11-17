@@ -8,6 +8,7 @@ must leave it unavailable until an authoritative reproducible contract exists.
 
 from __future__ import annotations
 
+import hashlib
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,10 +16,19 @@ from enum import StrEnum
 from fractions import Fraction
 
 from polymarket_pair_maker.core.exact import ExactDecimal, Money, Price, Quantity, RoundingMode
-from polymarket_pair_maker.core.ids import AssetId
-from polymarket_pair_maker.core.serialization import canonical_sha256
+from polymarket_pair_maker.core.ids import AssetId, InstrumentId, MarketId
+from polymarket_pair_maker.core.serialization import (
+    canonical_json_bytes,
+    canonical_sha256,
+    is_canonically_immutable,
+)
 from polymarket_pair_maker.core.time import UtcTimestamp
-from polymarket_pair_maker.state.order_books import BookHealth, ImmutableOrderBookSnapshot
+from polymarket_pair_maker.reference.models import BitemporalFields
+from polymarket_pair_maker.state.order_books import (
+    BookHealth,
+    BookLevel,
+    ImmutableOrderBookSnapshot,
+)
 
 from .reference import ExactRatio, RuleEvidence
 
@@ -484,6 +494,11 @@ def _evaluate_reward_snapshot(
     )
 
 
+type _RewardBookInput = tuple[
+    InstrumentId, MarketId, bool, tuple[BookLevel, ...], tuple[BookLevel, ...]
+]
+
+
 class RewardScoreCache:
     """Bounded exact-result memoization for immutable accepted book views.
 
@@ -500,7 +515,16 @@ class RewardScoreCache:
     contributions. Comparing accepted immutable level tuples does not create a
     second canonical book owner. Oversized books bypass this optional derived
     cache and retain the identical pure result without unbounded cache growth.
+
+    One further cell retains the last complete pure input and result across new
+    immutable snapshots. Its key includes every book field the reward evaluator
+    reads, plus freshly encoded rules, orders and time-dependent eligibility.
+    It retains at most 64 KiB of non-book bytes and 16,384 complete book levels;
+    mutable, unknown or oversized snapshot graphs bypass and clear this cell.
     """
+
+    maximum_pure_key_bytes = 65_536
+    maximum_pure_level_entries = 16_384
 
     def __init__(self, capacity: int = 128, *, maximum_level_entries: int = 4096) -> None:
         if type(capacity) is not int or not 1 <= capacity <= 4096:
@@ -514,6 +538,12 @@ class RewardScoreCache:
         self.cached_level_hits = 0
         self.cached_level_misses = 0
         self.level_invalidations = 0
+        self.pure_cache_hits = 0
+        self.pure_cache_misses = 0
+        self.pure_cache_bypasses = 0
+        self._last_pure: tuple[bytes, _RewardBookInput, _RewardBookInput, RewardEstimate] | None = (
+            None
+        )
         self._level_reference: str | None = None
         self._level_scores: dict[tuple[str, ExactDecimal], tuple[ExactDecimal, Fraction]] = {}
         self._competitor_mass = Fraction(0)
@@ -529,6 +559,10 @@ class RewardScoreCache:
     @property
     def cached_level_entries(self) -> int:
         return len(self._level_scores)
+
+    @property
+    def cached_pure_entries(self) -> int:
+        return int(self._last_pure is not None)
 
     def _incremental_competitor_mass(
         self,
@@ -605,35 +639,87 @@ class RewardScoreCache:
             book.last_valid_update_time is None or book.last_valid_update_time > decision_at
             for book in (yes_book, no_book)
         )
-        key = (
-            id(yes_book),
-            id(no_book),
-            canonical_sha256(
-                (
-                    rules,
-                    own_orders,
-                    depth_complete,
-                    age_eligible,
-                    rules.eligibility_reasons(decision_at),
-                    reference_future,
-                )
-            ),
+        nonbook_input = (
+            rules,
+            own_orders,
+            depth_complete,
+            age_eligible,
+            rules.eligibility_reasons(decision_at),
+            reference_future,
         )
+        nonbook = canonical_json_bytes(nonbook_input)
+        key = (id(yes_book), id(no_book), hashlib.sha256(nonbook).hexdigest())
         cached = self._entries.get(key)
         if cached is not None:
             self.hits += 1
             self._entries.move_to_end(key)
             return cached[2]
         self.misses += 1
-        result = _evaluate_reward_snapshot(
-            yes_book,
-            no_book,
-            own_orders,
-            rules,
-            decision_at,
-            depth_complete=depth_complete,
-            mass_evaluator=self._incremental_competitor_mass,
+        reusable = (
+            len(nonbook) <= self.maximum_pure_key_bytes
+            # These fields are returned directly rather than newly computed.
+            # Primitive Enum values can share JSON bytes with plain strings.
+            and type(rules.evidence.version) is str
+            and all(type(reason) is str for reason in rules.evidence.unresolved_requirements)
+            and is_canonically_immutable(
+                nonbook_input,
+                audited_types=(
+                    RewardRules,
+                    RuleEvidence,
+                    BitemporalFields,
+                    RewardOrder,
+                    Money,
+                    Price,
+                    Quantity,
+                ),
+            )
+            and sum(
+                len(levels) for levels in (yes_book.bids, yes_book.asks, no_book.bids, no_book.asks)
+            )
+            <= self.maximum_pure_level_entries
+            and yes_book.canonical_cache_eligible()
+            and no_book.canonical_cache_eligible()
         )
+        pure_key: tuple[bytes, _RewardBookInput, _RewardBookInput] | None = None
+        if reusable:
+            pure_key = (
+                nonbook,
+                (
+                    yes_book.instrument_id,
+                    yes_book.market_id,
+                    yes_book.health is BookHealth.HEALTHY,
+                    yes_book.bids,
+                    yes_book.asks,
+                ),
+                (
+                    no_book.instrument_id,
+                    no_book.market_id,
+                    no_book.health is BookHealth.HEALTHY,
+                    no_book.bids,
+                    no_book.asks,
+                ),
+            )
+        previous = self._last_pure
+        if pure_key is not None and previous is not None and pure_key == previous[:3]:
+            self.pure_cache_hits += 1
+            result = previous[3]
+        else:
+            if pure_key is None:
+                self.pure_cache_bypasses += 1
+                self._last_pure = None
+            else:
+                self.pure_cache_misses += 1
+            result = _evaluate_reward_snapshot(
+                yes_book,
+                no_book,
+                own_orders,
+                rules,
+                decision_at,
+                depth_complete=depth_complete,
+                mass_evaluator=self._incremental_competitor_mass,
+            )
+            if pure_key is not None:
+                self._last_pure = (*pure_key, result)
         self._entries[key] = (yes_book, no_book, result)
         while len(self._entries) > self.capacity:
             self._entries.popitem(last=False)
