@@ -76,7 +76,10 @@ from the repository root and verify the inferred workspace explicitly. Storage
 paths are repository-relative, must remain inside that workspace after symlink
 resolution, and cannot point through a symlink to an external evidence directory.
 Use fresh ignored `data/` roots for capture; retain review logs and bindings in
-external storage. The calibration report output may be a fresh external path.
+fresh external stage storage, disjoint from the sealed Task 7A evidence. The
+calibration report output may also be a fresh external path. Treat sealed
+configuration, runtime and review files as read-only inputs to the later stage;
+keep its approved authorization and generated outputs outside that evidence root.
 
 The observer creates run-ID-scoped files inside configured roots. It does not
 require the whole root to be fresh. Before launch, reject an existing or symlinked
@@ -209,6 +212,7 @@ it does not prevent the authorized application from contacting public services.
 cd /home/peppasmich/projects/polymarket-pair-maker
 E=/home/peppasmich/projects/polymarket-pair-maker-task7a-evidence-20261117
 CFG="$E/collector/configs/smoke-a01.toml"
+AUTHORIZATION=/home/peppasmich/projects/polymarket-pair-maker-smoke-authorization-20261117-a01.json
 
 # Safe offline checklist; the unapproved template must refuse with exit 3.
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src ./scripts/uv run --frozen --offline --no-sync --all-groups python "$E/collector/run_smoke.py" --check
@@ -217,8 +221,13 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src ./scripts/uv run --frozen --offline --n
 ./scripts/uv run --frozen --offline --no-sync --all-groups ppm observe polymarket --duration 60 --gamma-market-id 703257 --config "$CFG"
 
 # NOT RUN: only after both owner decisions and all exact-source prerequisites.
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src ./scripts/uv run --frozen --offline --no-sync --all-groups python "$E/collector/run_smoke.py" --authorization "$E/collector/smoke-authorization.approved.json" --execute
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src ./scripts/uv run --frozen --offline --no-sync --all-groups python "$E/collector/run_smoke.py" --authorization "$AUTHORIZATION" --execute
 ```
+
+The proposed command-output root is the fresh sibling
+`/home/peppasmich/projects/polymarket-pair-maker-smoke-evidence-20261117-a01`.
+Neither that directory nor the approved authorization file exists as evidence of
+an authorized run in Task 7A.
 
 The launcher refuses reused roots, dirty source, mismatched source/config/lock/
 target hashes, incomplete review references and unaccepted supervision budgets.
