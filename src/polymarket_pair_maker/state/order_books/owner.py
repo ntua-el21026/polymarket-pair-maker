@@ -20,7 +20,11 @@ from polymarket_pair_maker.core.provenance import (
     RawSourceRef,
     merge_raw_source_refs,
 )
-from polymarket_pair_maker.core.serialization import canonical_sha256
+from polymarket_pair_maker.core.serialization import (
+    canonical_sha256,
+    is_canonically_immutable,
+    register_canonical_sequence,
+)
 from polymarket_pair_maker.core.time import UtcTimestamp
 from polymarket_pair_maker.normalization import (
     BookSide,
@@ -54,6 +58,7 @@ class BookStateError(RuntimeError):
 
 
 _MAX_LEVELS_PER_SIDE = 4096
+_ONE = ExactDecimal.one()
 _MAX_RAW_SOURCE_REFS_PER_INPUT = 4096
 # A fully source-diverse valid book can have one distinct supplier for each
 # level on both sides plus the latest freshness boundary.
@@ -320,6 +325,18 @@ class CanonicalL2BookOwner:
         self._snapshot_cache: ImmutableOrderBookSnapshot | None = None
         self._content_hash_cache: str | None = None
         self._economic_hash_cache: str | None = None
+        self._validated_sides_cache: (
+            tuple[
+                tuple[CanonicalBookLevel, ...],
+                tuple[CanonicalBookLevel, ...],
+                ExactDecimal,
+                tuple[BookLevel, ...],
+                tuple[BookLevel, ...],
+            ]
+            | None
+        ) = None
+        self.validation_cache_hits = 0
+        self.validation_cache_misses = 0
 
     @property
     def instrument_id(self) -> InstrumentId:
@@ -377,6 +394,7 @@ class CanonicalL2BookOwner:
         )
 
     def _invalid_state_kinds(self, reason: InvalidationReason) -> BookMutationKind:
+        self._validated_sides_cache = None
         if self._health is BookHealth.CLOSED:
             return BookMutationKind.NONE
         kinds = BookMutationKind.NONE
@@ -507,6 +525,7 @@ class CanonicalL2BookOwner:
             )
             levels_changed = bool(self._bids or self._asks)
             self._health = BookHealth.CLOSED
+            self._validated_sides_cache = None
             self._reason = InvalidationReason.MARKET_RESOLVED_REFERENCE_REFRESH
             self._bids = ()
             self._asks = ()
@@ -573,7 +592,7 @@ class CanonicalL2BookOwner:
         return self._mutation(BookMutationKind.NONE)
 
     def _validate_level(self, level: CanonicalBookLevel) -> None:
-        if level.price.value > ExactDecimal.one():
+        if level.price.value > _ONE:
             raise BookStateError("prediction-market price exceeds one")
         if not self._precision_verified or self._tick_size is None:
             raise BookStateError("current precision reference is not verified")
@@ -592,8 +611,25 @@ class CanonicalL2BookOwner:
         bid_levels = tuple(bids)
         ask_levels = tuple(asks)
         if len(bid_levels) > _MAX_LEVELS_PER_SIDE or len(ask_levels) > _MAX_LEVELS_PER_SIDE:
+            self._validated_sides_cache = None
             self.invalidate(InvalidationReason.PROTOCOL_VIOLATION)
             raise BookStateError("book side exceeds 4096 active levels")
+        previous = self._validated_sides_cache
+        if (
+            previous is not None
+            and bid_levels is previous[0]
+            and ask_levels is previous[1]
+            and self._tick_size is previous[2]
+            and self._precision_verified is True
+        ):
+            self.validation_cache_hits += 1
+            for levels in (previous[3], previous[4]):
+                register_canonical_sequence(
+                    levels, element_type=BookLevel, audited_types=(BookLevel, Price, Quantity)
+                )
+            return previous[3], previous[4]
+        self.validation_cache_misses += 1
+        self._validated_sides_cache = None
         for level in (*bid_levels, *ask_levels):
             self._validate_level(level)
         try:
@@ -605,6 +641,25 @@ class CanonicalL2BookOwner:
         if self._crossed(sorted_bids, sorted_asks):
             self.invalidate(InvalidationReason.IMPOSSIBLE_STATE)
             raise BookStateError("snapshot is crossed")
+        if (
+            self._precision_verified is True
+            and type(self._tick_size) is ExactDecimal
+            and is_canonically_immutable(
+                (bid_levels, ask_levels, self._tick_size),
+                audited_types=(CanonicalBookLevel, Price, Quantity),
+            )
+        ):
+            self._validated_sides_cache = (
+                bid_levels,
+                ask_levels,
+                self._tick_size,
+                sorted_bids,
+                sorted_asks,
+            )
+            for levels in (sorted_bids, sorted_asks):
+                register_canonical_sequence(
+                    levels, element_type=BookLevel, audited_types=(BookLevel, Price, Quantity)
+                )
         return sorted_bids, sorted_asks
 
     def apply_snapshot(

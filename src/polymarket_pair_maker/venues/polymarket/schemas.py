@@ -12,6 +12,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import lru_cache
 from typing import TypeVar, cast
 
 from polymarket_pair_maker.core.exact import ExactDecimal, Quantity
@@ -151,6 +152,12 @@ def _optional_boolean(obj: Mapping[str, object], key: str, path: str) -> bool | 
     return _boolean(value, f"{path}.{key}")
 
 
+@lru_cache(maxsize=4096)
+def _exact_decimal_text(text: str) -> ExactDecimal:
+    """Reuse successful bounded source lexemes; failures remain path-specific."""
+    return ExactDecimal.parse(text)
+
+
 def _decimal(value: object, path: str) -> ExactDecimal:
     if not isinstance(value, (JsonNumber, str)):
         raise PolymarketSchemaError(path, "expected an exact JSON number or decimal string")
@@ -161,7 +168,7 @@ def _decimal(value: object, path: str) -> ExactDecimal:
             f"decimal exceeds the {_MAX_DECIMAL_CHARACTERS}-character resource limit",
         )
     try:
-        return ExactDecimal.parse(text)
+        return _exact_decimal_text(text)
     except (TypeError, ValueError) as error:
         raise PolymarketSchemaError(path, f"invalid decimal: {error}") from error
 

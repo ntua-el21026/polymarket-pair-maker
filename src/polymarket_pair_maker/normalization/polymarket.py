@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+from collections import OrderedDict
 from dataclasses import dataclass
+from typing import cast
 
 from polymarket_pair_maker.core.exact import ExactDecimal, Price, Quantity
 from polymarket_pair_maker.core.ids import (
@@ -85,25 +87,130 @@ class NormalizationContext:
         )
 
 
+_MAX_CACHED_LEVELS = 4096
+_LEVEL_CACHE: OrderedDict[tuple[ExactDecimal, ExactDecimal], CanonicalBookLevel] = OrderedDict()
+_level_cache_hits = 0
+_level_cache_misses = 0
+_MAX_CACHED_SIDE_LEVELS = 4096
+_SIDE_CACHE: dict[BookSide, tuple[tuple[NativeBookLevel, ...], tuple[CanonicalBookLevel, ...]]] = {}
+_side_cache_hits = 0
+_side_cache_misses = 0
+_side_cache_bypasses = 0
+
+
+def _level_cache_key(price: object, size: object) -> tuple[ExactDecimal, ExactDecimal] | None:
+    # Direct native-event callers need not share the parser's 128-character
+    # lexeme limit. Oversized or unknown actual values keep the original path.
+    for value in (price, size):
+        if not (
+            type(value) is ExactDecimal
+            and type(value.coefficient) is int
+            and type(value.scale) is int
+            and value.coefficient.bit_length() <= 512
+            and 0 <= value.scale <= 128
+        ):
+            return None
+    return cast(tuple[ExactDecimal, ExactDecimal], (price, size))
+
+
+def normalization_level_cache_info() -> dict[str, int]:
+    """Expose bounded pure-construction reuse counters for diagnostic evidence."""
+    return {
+        "hits": _level_cache_hits,
+        "misses": _level_cache_misses,
+        "maxsize": _MAX_CACHED_LEVELS,
+        "currsize": len(_LEVEL_CACHE),
+    }
+
+
+def normalization_side_cache_info() -> dict[str, int]:
+    """Report last-successful exact side reuse, separate from per-level work."""
+    return {
+        "hits": _side_cache_hits,
+        "misses": _side_cache_misses,
+        "bypasses": _side_cache_bypasses,
+        "maxsize": 2,
+        "maximum_levels_per_side": _MAX_CACHED_SIDE_LEVELS,
+        "currsize": len(_SIDE_CACHE),
+        "retained_native_levels": sum(len(entry[0]) for entry in _SIDE_CACHE.values()),
+    }
+
+
+def _side_cacheable(values: tuple[NativeBookLevel, ...], side: BookSide) -> bool:
+    if (
+        type(side) is not BookSide
+        or type(values) is not tuple
+        or len(values) > _MAX_CACHED_SIDE_LEVELS
+    ):
+        return False
+    for level in values:
+        if type(level) is not NativeBookLevel:
+            return False
+        for value in (level.price, level.size):
+            if not (
+                type(value) is ExactDecimal
+                and type(value.coefficient) is int
+                and type(value.scale) is int
+                and value.coefficient.bit_length() <= 512
+                and 0 <= value.scale <= 128
+            ):
+                return False
+    return True
+
+
 def _levels(
     values: tuple[NativeBookLevel, ...], *, side: BookSide
 ) -> tuple[CanonicalBookLevel, ...]:
+    global _level_cache_hits, _level_cache_misses
+    global _side_cache_hits, _side_cache_misses, _side_cache_bypasses
+    reusable = _side_cacheable(values, side)
+    if reusable:
+        previous = _SIDE_CACHE.get(side)
+        if previous is not None and previous[0] == values:
+            _side_cache_hits += 1
+            return previous[1]
+        _side_cache_misses += 1
+        _SIDE_CACHE.pop(side, None)
+    else:
+        _side_cache_bypasses += 1
+        if type(side) is BookSide:
+            _SIDE_CACHE.pop(side, None)
     result: list[CanonicalBookLevel] = []
     prices: set[ExactDecimal] = set()
+    one, zero = ExactDecimal.one(), ExactDecimal.zero()
     for level in values:
-        try:
-            price = Price(level.price)
-            quantity = Quantity(level.size)
-        except (TypeError, ValueError) as error:
-            raise NormalizationError(f"invalid {side.value} book level: {error}") from error
-        if price.value > ExactDecimal.one():
+        key = _level_cache_key(level.price, level.size)
+        cached = None if key is None else _LEVEL_CACHE.get(key)
+        if key is not None and cached is not None:
+            _level_cache_hits += 1
+            _LEVEL_CACHE.move_to_end(key)
+            price, quantity = cached.price, cached.quantity
+        else:
+            _level_cache_misses += 1
+            try:
+                price = Price(level.price)
+                quantity = Quantity(level.size)
+            except (TypeError, ValueError) as error:
+                raise NormalizationError(f"invalid {side.value} book level: {error}") from error
+        if price.value > one:
             raise NormalizationError("prediction-market book price exceeds one")
         if price.value in prices:
             raise NormalizationError("snapshot contains duplicate prices on one side")
         prices.add(price.value)
-        if quantity.value != ExactDecimal.zero():
-            result.append(CanonicalBookLevel(price=price, quantity=quantity))
-    return tuple(sorted(result, key=lambda item: item.price.value, reverse=side is BookSide.BID))
+        if quantity.value != zero:
+            if cached is None:
+                cached = CanonicalBookLevel(price=price, quantity=quantity)
+                if key is not None:
+                    _LEVEL_CACHE[key] = cached
+                    if len(_LEVEL_CACHE) > _MAX_CACHED_LEVELS:
+                        _LEVEL_CACHE.popitem(last=False)
+            result.append(cached)
+    normalized = tuple(
+        sorted(result, key=lambda item: item.price.value, reverse=side is BookSide.BID)
+    )
+    if reusable:
+        _SIDE_CACHE[side] = (values, normalized)
+    return normalized
 
 
 def _canonical_payload_components(payload: CanonicalPayload) -> tuple[str, ...]:
