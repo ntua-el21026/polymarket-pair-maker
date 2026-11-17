@@ -26,6 +26,8 @@ unavailable.
 | [Research basis](docs/RESEARCH_BASIS.md) | Sources, findings, and implementation consequences |
 | [Validation gates](docs/VALIDATION_GATES.md) | Migration, implementation, and independent acceptance |
 | [Calibration readiness](docs/CALIBRATION_READINESS.md) | Offline causal support checks and explicit evidence limits |
+| [Qualified environment](docs/REPRODUCIBILITY.md) | Isolated exact tool selection and reproducible verification |
+| [Collector preflight](docs/COLLECTOR_PREFLIGHT.md) | Prospective observation prerequisites and separately authorized stages |
 | [Roadmap](docs/ROADMAP.md) | The agreed three-task sequence |
 | [Paper decisions](docs/ADR/0002-paper-economics-and-simulation.md) | Economic uncertainty and simulation contracts |
 | [SDK decision](docs/ADR/0003-defer-official-sdk.md) | Retained public transport and deferred SDK |
@@ -35,25 +37,27 @@ unavailable.
 
 Use ordinary-GIL CPython **3.14.7** and **uv 0.12.5**, as declared in
 `.python-version` and `pyproject.toml`. Direct dependencies and transitive
-dependencies are pinned. Run commands from the repository root.
+dependencies are pinned. Run commands from the repository root. Bootstrap the
+project-local pinned tool as described in [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md);
+`./scripts/uv` selects it explicitly and leaves the global toolchain unchanged.
 
 ```bash
 git clone git@github.com:ntua-el21026/polymarket-pair-maker.git
 cd polymarket-pair-maker
-uv python install
-uv lock --check
-uv sync --frozen --all-groups
-uv run --frozen --all-groups ppm --help
+./scripts/uv python install
+./scripts/uv lock --check
+./scripts/uv sync --frozen --all-groups
+./scripts/uv run --frozen --all-groups ppm --help
 ```
 
 The public-data CLI supports bounded observation and calibration, raw-journal
 replay, analytical reconstruction, and integrity validation:
 
 ```bash
-uv run --frozen --all-groups ppm observe polymarket --duration 60 --gamma-market-id <id> --config config/phase1.toml
-uv run --frozen --all-groups ppm replay data/raw --run-id <run-id> --config config/phase1.toml
-uv run --frozen --all-groups ppm rebuild-analytical data/raw --output data/rebuilt/<run-id> --run-id <run-id> --config config/phase1.toml
-uv run --frozen --all-groups ppm validate-data data
+./scripts/uv run --frozen --all-groups ppm observe polymarket --duration 60 --gamma-market-id <id> --config config/phase1.toml
+./scripts/uv run --frozen --all-groups ppm replay data/raw --run-id <run-id> --config config/phase1.toml
+./scripts/uv run --frozen --all-groups ppm rebuild-analytical data/raw --output data/rebuilt/<run-id> --run-id <run-id> --config config/phase1.toml
+./scripts/uv run --frozen --all-groups ppm validate-data data
 ```
 
 Observation and calibration contact external public services. Replay and local
@@ -63,12 +67,12 @@ raw journal. `replay --expect-terminal-hash <hash>` compares against a separatel
 recorded terminal hash for the same processor contract and configuration.
 
 ```bash
-uv run --frozen --all-groups ruff check .
-uv run --frozen --all-groups ruff format --check .
-uv run --frozen --all-groups pyright
-uv run --frozen --all-groups pytest -q
-uv run --frozen --all-groups pre-commit run --all-files
-uv build
+./scripts/uv run --frozen --all-groups ruff check .
+./scripts/uv run --frozen --all-groups ruff format --check .
+./scripts/uv run --frozen --all-groups pyright
+./scripts/uv run --frozen --all-groups pytest -q
+./scripts/uv run --frozen --all-groups pre-commit run --all-files
+./scripts/uv build
 ```
 
 Dependency-audit instructions and the distinction between local checks and
@@ -81,15 +85,15 @@ Run the committed **SYNTHETIC** fixture in a fresh output directory:
 
 ```bash
 mkdir -p data/paper
-uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-a
-uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-b
+./scripts/uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-a
+./scripts/uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-b
 diff -r data/paper/demo-a data/paper/demo-b
 ```
 
 Replay a complete, integrity-verified raw run without network access:
 
 ```bash
-uv run --frozen --all-groups ppm paper replay data/raw --run-id <run-id> --config config/phase1.toml --paper-config config/paper.toml --output data/paper/<fresh-session>
+./scripts/uv run --frozen --all-groups ppm paper replay data/raw --run-id <run-id> --config config/phase1.toml --paper-config config/paper.toml --output data/paper/<fresh-session>
 ```
 
 `config/paper.toml` declares exact decimal assumptions, bounds and engineering
@@ -113,8 +117,8 @@ runtime provenance and deterministic result hashes. Raw evidence is never an
 output destination; existing output directories are rejected.
 
 ```bash
-uv run --frozen --all-groups pytest -q tests/unit tests/property tests/integration tests/golden
-uv run --frozen --all-groups python -m benchmarks.paper_system --iterations 200 --output data/paper-benchmark.json
+./scripts/uv run --frozen --all-groups pytest -q tests/unit tests/property tests/integration tests/golden
+./scripts/uv run --frozen --all-groups python -m benchmarks.paper_system --iterations 200 --output data/paper-benchmark.json
 ```
 
 The benchmark records its runtime, host and bounded workload; its measurements
@@ -154,7 +158,7 @@ inventory, scoped references, chronology, state chains and terminal result befor
 atomic publication. Independently verify an existing completed result with:
 
 ```bash
-uv run --frozen --all-groups python -m polymarket_pair_maker.paper.verification data/paper/<completed-session>
+./scripts/uv run --frozen --all-groups python -m polymarket_pair_maker.paper.verification data/paper/<completed-session>
 ```
 
 `iter_reconstructed_records(path)` in `paper.verification` yields exact typed
@@ -187,5 +191,12 @@ Measured exact-computation reuse is described in
 The new 120 records/s internal target requires three complete frozen-source
 formal attempts at every depth, separately from the original 100 records/s gate.
 The external Task 6 handoff records all measured outcomes; synthetic replay
-capacity does not establish production headroom or economic viability. No new
-collection or support contact was initiated; both next-step requests are drafts.
+capacity does not establish production headroom or economic viability. Task 6
+initiated no collection or support contact; its drafts remain historical evidence.
+
+Task 7A records the owner-reported technical inquiry sent to
+`support@polymarket.com` on 2026-11-17. Its response is pending; no reply or exact
+sent body has been independently read. No duplicate contact was made. The
+[prospective collector preflight](docs/COLLECTOR_PREFLIGHT.md) prepares a separately
+identified run while retaining historical Gate 1 FAIL. No smoke, calibration,
+stability observation or soak is authorized by offline readiness.

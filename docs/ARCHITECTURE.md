@@ -238,3 +238,22 @@ and independent of paper admission and the existing estimator. Complete-day
 splits, embargoes, missing horizons and descriptive support are documented in
 [CALIBRATION_READINESS.md](CALIBRATION_READINESS.md). Declared hashes/statuses do
 not authenticate upstream evidence; readiness requires independent review.
+
+## Task 7A operational readiness
+
+The project-local [tool launcher](REPRODUCIBILITY.md) selects the exact uv version
+without changing the global toolchain. It is a development boundary, independent
+of financial or paper execution code.
+
+Pre-soak workload calibration now emits explicit v2 reports/bindings that include
+availability-ledger bytes, interval counts, queue pressure and writer integrity.
+[ADR-0007](ADR/0007-complete-availability-capacity-projection.md) records the
+independently reproduced omission and narrow correction. Original v1 evidence
+retains its narrower scope; no in-place migration or new acceptance claim occurs.
+Execution calibration and its empirical requirements remain separate and unchanged.
+
+The [prospective collector preflight](COLLECTOR_PREFLIGHT.md) prepares a fresh
+source/configuration/lock/target lineage and independent qualification procedure.
+It grants no collection permission. Missing historical reconstruction cannot be
+replaced by relabeling a new run, and current venue-rule uncertainty continues
+to block economic admission.

@@ -142,5 +142,8 @@ The adjusted-midpoint construction, fee ties/partial-fill settlement and asset
 denomination, deployment bindings, reward minimum-age field and effective
 intervals remain unresolved. The synthetic midpoint convention remains barred
 for real-market admission. The external source/rule matrix identifies each
-supported claim and precise missing authority; its support inquiry is a draft
-that has not been sent. No fee, midpoint, reward or settlement default changed.
+supported claim and precise missing authority. Its Task 6 inquiry remains an
+immutable historical draft. The owner reports sending a technical inquiry to
+`support@polymarket.com` on 2026-11-17; a response is pending and has not been
+independently read. Task 7A records that status separately; no additional contact
+was made. No fee, midpoint, reward or settlement default changed.

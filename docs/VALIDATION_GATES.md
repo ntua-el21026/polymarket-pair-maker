@@ -202,3 +202,38 @@ Historical collector Gate 1 remains FAIL. Venue qualification remains BLOCKED;
 execution calibration and empirical economic viability remain
 INSUFFICIENT_EVIDENCE. Synthetic performance cannot qualify representative
 production throughput or authorize live execution.
+
+## Task 7A — Offline prospective collector readiness
+
+Use the exact project-local tool and fresh qualified environment in
+[REPRODUCIBILITY.md](REPRODUCIBILITY.md). Verify all original test identities,
+typing, lint/format, pre-commit, fixtures, lock, build, installed-wheel/CLI smoke
+and the configured dependency audit. Preserve global tool identities and all
+earlier evidence. Tool repair does not change Python, dependency or benchmark
+requirements.
+
+Prospective workload/storage admission requires the complete v2 calibration
+contract in [ADR-0007](ADR/0007-complete-availability-capacity-projection.md),
+including availability bytes/counts, queue pressure and writer integrity. Apply
+the original two-times-workload, 25% disk-safety, reserve and resource limits;
+unknown or contradictory measurements cannot pass. Historical v1 PASS means
+only its original narrower scope and cannot authorize the later stage.
+
+The source/configuration/lock/target freeze, fresh roots, bounded external
+captures, health/availability/recovery evidence, abort conditions and independent
+replay procedures are in [COLLECTOR_PREFLIGHT.md](COLLECTOR_PREFLIGHT.md).
+The sequence remains 60-second smoke, 180-second storage calibration,
+2,700-second stability observation and 21,600-second soak. Each stage needs its
+own explicit authorization; offline preparation authorizes none of them.
+
+If the historical corpus remains absent, an explicit owner decision must create
+a separately identified prospective research lineage. It cannot satisfy the
+original two corrected failed-run replays, erase historical Gate 1 FAIL, or
+recover missing causal evidence. Any later prospective qualification must be
+reported independently under the retained standard.
+
+The owner reports a technical support inquiry sent on 2026-11-17; the response
+remains pending. Venue rules, qualified historical/operational evidence, actual
+execution calibration, empirical economics and representative production
+capacity remain independently blocked or insufficiently evidenced. No synthetic
+or static preflight result promotes these gates to PASS.

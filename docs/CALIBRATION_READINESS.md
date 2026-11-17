@@ -8,7 +8,7 @@ its synthetic defaults, financial arithmetic and paper admission stay unchanged.
 Run with the pinned project environment:
 
 ```bash
-uv run --frozen --all-groups python -m polymarket_pair_maker.research.calibration_readiness input.json --output fresh-report.json
+./scripts/uv run --frozen --all-groups python -m polymarket_pair_maker.research.calibration_readiness input.json --output fresh-report.json
 ```
 
 The input is `CalibrationReadinessInput`, canonically serialized using the existing
@@ -100,4 +100,7 @@ Current Task 6 source/data manifests contain no qualified execution population.
 The actual-input readiness result is `INSUFFICIENT_EVIDENCE`; synthetic fixtures
 test mechanics only. No calibration or profitability optimization is authorized
 by a readiness result. See the external Task 6 handoff for current blockers and
-the draft verification/collection requests; neither has been sent or executed.
+the historical verification/collection drafts. The owner reports sending a
+technical support inquiry on 2026-11-17; the reply remains pending and unread.
+The historical Task 6 draft is preserved separately from that owner report.
+No collection stage has been executed or authorized by Task 7A.
