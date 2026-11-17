@@ -356,6 +356,30 @@ def is_canonically_immutable(value: object, *, audited_types: tuple[type[object]
     return _immutable(value, audited_types, set(), [], [])
 
 
+def _uses_dataclass_projection(value: object) -> bool:
+    # These canonical scalar branches precede dataclass dispatch. A frozen
+    # audited dataclass may also inherit from one of these scalar classes.
+    return is_dataclass(value) and not isinstance(
+        value,
+        (
+            type,
+            bool,
+            int,
+            str,
+            float,
+            ExactDecimal,
+            Price,
+            Quantity,
+            TypedId,
+            UtcTimestamp,
+            MonotonicTimestamp,
+            bytes,
+            Path,
+            Enum,
+        ),
+    )
+
+
 class CanonicalMemo:
     """Object-owned exact encodings for explicitly audited immutable dataclasses.
 
@@ -435,6 +459,66 @@ class CanonicalMemo:
             return previous if previous is not None else _encode(normalized)
         return _encode(_canonical_dataclass(value, allow_floats=allow_floats))
 
+    def subset_sha256(self, value: object, field_names: tuple[str, ...], schema: str) -> str:
+        """Compose proven sequence bytes after full declaration-order normalization."""
+        if not self.eligible(value) or not _uses_dataclass_projection(value):
+            raise CanonicalSerializationError(
+                "canonical subset composition requires an audited owner"
+            )
+        normalized: dict[str, CanonicalValue] = {}
+        fragments: dict[str, bytes] = {}
+        available: dict[str, None] = {}
+        for item in _dataclass_fields(type(value)):
+            if not item.metadata.get("canonical_serialize", True):
+                continue
+            actual = getattr(value, item.name)
+            sequence = _registered_sequence(actual)
+            if sequence is None:
+                normalized[item.name] = canonicalize(actual)
+            else:
+                # Registration already proved the identical strict projection.
+                fragments[item.name] = sequence.encoded
+            available[item.name] = None
+
+        def fragment(name: str) -> bytes:
+            previous = fragments.get(name)
+            if previous is None:
+                previous = _encode(normalized[name])
+                fragments[name] = previous
+            return previous
+
+        def compose(names: dict[str, None]) -> bytes:
+            return (
+                b"{"
+                + b",".join(_encode(name) + b":" + fragment(name) for name in sorted(names))
+                + b"}"
+            )
+
+        # The original projection primes this same full-owner memo. Preserve
+        # its encoding-only failure boundary and unchanged aggregate byte bound.
+        if False not in self._encoded and False not in self._unmemoized_modes:
+            try:
+                full = compose(available)
+            except ValueError, UnicodeError:
+                self._unmemoized_modes.add(False)
+            else:
+                if len(full) + self.retained_bytes <= self.maximum_bytes:
+                    self._encoded[False] = full
+                else:
+                    self._unmemoized_modes.add(False)
+
+        selected = {name: available[name] for name in field_names}
+        normalized["schema"] = canonicalize(schema)
+        fragments.pop("schema", None)
+        selected["schema"] = None
+        try:
+            result = compose(selected)
+        except ValueError, UnicodeError:
+            # Whole-tree encoding reports global UTF-8 positions and can find
+            # a later JSON error before the final UTF-8 conversion fails.
+            raise _FragmentEncodingFailure from None
+        return hashlib.sha256(result).hexdigest()
+
 
 class CanonicalMemoized:
     """Explicit opt-in; each dataclass supplies its own excluded memo field."""
@@ -454,6 +538,16 @@ class CanonicalMemoized:
 
     def canonical_subset_sha256(self, field_names: tuple[str, ...], *, schema: str) -> str:
         """Hash an explicit subset of a fully validated canonical projection."""
+        if (
+            _uses_dataclass_projection(self)
+            and type(self._canonical_memo) is CanonicalMemo
+            and type(self).canonical_projection is CanonicalMemoized.canonical_projection
+            and self._canonical_memo.eligible(self)
+        ):
+            try:
+                return self._canonical_memo.subset_sha256(self, field_names, schema)
+            except _FragmentEncodingFailure:
+                pass
         projected = canonicalize(self)
         if not isinstance(projected, dict):
             raise CanonicalSerializationError("canonical subset requires a dataclass projection")
