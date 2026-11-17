@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntFlag, StrEnum, auto
 
 from polymarket_pair_maker.core.exact import Price, Quantity
@@ -16,7 +16,11 @@ from polymarket_pair_maker.core.ids import (
     PrecisionRuleVersionId,
 )
 from polymarket_pair_maker.core.provenance import Provenance
-from polymarket_pair_maker.core.serialization import canonical_sha256
+from polymarket_pair_maker.core.serialization import (
+    CanonicalMemo,
+    CanonicalMemoized,
+    canonical_sha256,
+)
 from polymarket_pair_maker.core.time import UtcTimestamp
 
 
@@ -117,8 +121,8 @@ class PriceChangePreview:
     levels_changed: bool
 
 
-@dataclass(frozen=True, slots=True)
-class ImmutableOrderBookSnapshot:
+@dataclass(frozen=True, slots=True, weakref_slot=True)
+class ImmutableOrderBookSnapshot(CanonicalMemoized):
     instrument_id: InstrumentId
     market_id: MarketId
     generation: int
@@ -150,6 +154,32 @@ class ImmutableOrderBookSnapshot:
     supports_book_checksum: bool = False
     venue_sequence: None = None
     validated_checksum: None = None
+    _canonical_memo: CanonicalMemo = field(
+        default_factory=lambda: CanonicalMemo(
+            (ImmutableOrderBookSnapshot, BookLevel, Price, Quantity, Provenance)
+        ),
+        init=False,
+        repr=False,
+        compare=False,
+        hash=False,
+        metadata={"canonical_serialize": False},
+    )
+    _content_digest: str | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+        hash=False,
+        metadata={"canonical_serialize": False},
+    )
+    _economic_digest: str | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+        hash=False,
+        metadata={"canonical_serialize": False},
+    )
 
     def __post_init__(self) -> None:
         if self.generation < 0:
@@ -187,37 +217,57 @@ class ImmutableOrderBookSnapshot:
 
     def content_sha256(self) -> str:
         """Deterministically hash the complete immutable diagnostic view."""
-        return canonical_sha256({"schema": "mma-order-book-snapshot-v2", "snapshot": self})
+        if self._content_digest is not None:
+            return self._content_digest
+        result = canonical_sha256({"schema": "mma-order-book-snapshot-v2", "snapshot": self})
+        if self._canonical_memo.eligible(self):
+            object.__setattr__(self, "_content_digest", result)
+        return result
 
     def economic_content_sha256(self) -> str:
         """Hash only authoritative inputs used for binary book admission."""
 
-        return canonical_sha256(
-            {
-                "schema": "mma-order-book-economic-snapshot-v1",
-                "instrument_id": self.instrument_id,
-                "market_id": self.market_id,
-                "generation": self.generation,
-                "health": self.health,
-                "invalidation_reason": self.invalidation_reason,
-                "bids": self.bids,
-                "asks": self.asks,
-                "best_bid": self.best_bid,
-                "best_ask": self.best_ask,
-                "last_source_event_id": self.last_source_event_id,
-                "last_source_provenance": self.last_source_provenance,
-                "state_source_provenance": self.state_source_provenance,
-                "market_version_id": self.market_version_id,
-                "precision_rule_version_id": self.precision_rule_version_id,
-                "cost_rule_set_version_id": self.cost_rule_set_version_id,
-                "last_valid_update_time": self.last_valid_update_time,
-                "last_venue_timestamp": self.last_venue_timestamp,
-                "supports_sequence_numbers": self.supports_sequence_numbers,
-                "supports_book_checksum": self.supports_book_checksum,
-                "venue_sequence": self.venue_sequence,
-                "validated_checksum": self.validated_checksum,
-            }
-        )
+        if self._economic_digest is not None:
+            return self._economic_digest
+        values = {
+            "schema": "mma-order-book-economic-snapshot-v1",
+            "instrument_id": self.instrument_id,
+            "market_id": self.market_id,
+            "generation": self.generation,
+            "health": self.health,
+            "invalidation_reason": self.invalidation_reason,
+            "bids": self.bids,
+            "asks": self.asks,
+            "best_bid": self.best_bid,
+            "best_ask": self.best_ask,
+            "last_source_event_id": self.last_source_event_id,
+            "last_source_provenance": self.last_source_provenance,
+            "state_source_provenance": self.state_source_provenance,
+            "market_version_id": self.market_version_id,
+            "precision_rule_version_id": self.precision_rule_version_id,
+            "cost_rule_set_version_id": self.cost_rule_set_version_id,
+            "last_valid_update_time": self.last_valid_update_time,
+            "last_venue_timestamp": self.last_venue_timestamp,
+            "supports_sequence_numbers": self.supports_sequence_numbers,
+            "supports_book_checksum": self.supports_book_checksum,
+            "venue_sequence": self.venue_sequence,
+            "validated_checksum": self.validated_checksum,
+        }
+        if self.canonical_cache_eligible():
+            try:
+                result = self.canonical_subset_sha256(
+                    tuple(name for name in values if name != "schema"),
+                    schema="mma-order-book-economic-snapshot-v1",
+                )
+            except TypeError, ValueError, OverflowError, KeyError:
+                # Excluded trade diagnostics may be unencodable even though the
+                # authoritative economic fields still have an exact identity.
+                result = canonical_sha256(values)
+        else:
+            result = canonical_sha256(values)
+        if self._canonical_memo.eligible(self):
+            object.__setattr__(self, "_economic_digest", result)
+        return result
 
 
 __all__ = [
