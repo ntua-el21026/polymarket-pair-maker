@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, is_dataclass, make_dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -349,3 +350,37 @@ def test_enum_root_uses_original_enum_value_projection():
     assert value.canonical_cache_eligible()
     with pytest.raises(TypeError, match="canonical subset requires a dataclass projection"):
         value.canonical_subset_sha256((), schema="domain")
+
+
+def test_stateful_schema_is_normalized_once_even_when_utf8_encoding_fails():
+    class ChangingSchema(Mapping[str, object]):
+        def __init__(self) -> None:
+            self.visits = 0
+
+        def __iter__(self) -> Iterator[str]:
+            self.visits += 1
+            return iter(("status",))
+
+        def __getitem__(self, key: str) -> object:
+            if key != "status":
+                raise KeyError(key)
+            return "\ud800" if self.visits == 1 else "changed"
+
+        def __len__(self) -> int:
+            return 1
+
+    sample = Sample("first", "second", registered_values())
+    original_schema = ChangingSchema()
+    with pytest.raises(UnicodeError):
+        original_subset(sample, ("levels",), original_schema)
+    schema = ChangingSchema()
+    with pytest.raises(UnicodeError):
+        sample.canonical_subset_sha256(("levels",), schema=cast(str, cast(object, schema)))
+    assert schema.visits == original_schema.visits == 1
+
+
+def test_one_shot_field_selector_keeps_original_encoding_failure():
+    sample = Sample("\ud800", "second", registered_values())
+    selector = cast(tuple[str, ...], cast(object, iter(("z_first",))))
+    with pytest.raises(UnicodeError):
+        sample.canonical_subset_sha256(selector, schema="domain")

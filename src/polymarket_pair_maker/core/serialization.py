@@ -380,6 +380,14 @@ def _uses_dataclass_projection(value: object) -> bool:
     )
 
 
+def _immutable_subset_parameters(field_names: tuple[str, ...], schema: str) -> bool:
+    return (
+        type(field_names) is tuple
+        and type(schema) is str
+        and all(type(name) is str for name in field_names)
+    )
+
+
 class CanonicalMemo:
     """Object-owned exact encodings for explicitly audited immutable dataclasses.
 
@@ -461,7 +469,11 @@ class CanonicalMemo:
 
     def subset_sha256(self, value: object, field_names: tuple[str, ...], schema: str) -> str:
         """Compose proven sequence bytes after full declaration-order normalization."""
-        if not self.eligible(value) or not _uses_dataclass_projection(value):
+        if (
+            not self.eligible(value)
+            or not _uses_dataclass_projection(value)
+            or not _immutable_subset_parameters(field_names, schema)
+        ):
             raise CanonicalSerializationError(
                 "canonical subset composition requires an audited owner"
             )
@@ -540,6 +552,7 @@ class CanonicalMemoized:
         """Hash an explicit subset of a fully validated canonical projection."""
         if (
             _uses_dataclass_projection(self)
+            and _immutable_subset_parameters(field_names, schema)
             and type(self._canonical_memo) is CanonicalMemo
             and type(self).canonical_projection is CanonicalMemoized.canonical_projection
             and self._canonical_memo.eligible(self)
