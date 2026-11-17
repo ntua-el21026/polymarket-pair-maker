@@ -1,0 +1,52 @@
+{
+  "schema_version": "ppm-paper-synthetic-golden-v1",
+  "classification": "SYNTHETIC",
+  "raw_record_count": 8,
+  "scenarios": {
+    "STRICT_PESSIMISTIC": {
+      "cash": "1000",
+      "reserved": "0",
+      "acquisition_basis": "0",
+      "realized_pnl": "0",
+      "liquidation_pnl": "0",
+      "positions": [],
+      "actions": {"NO_QUOTE": 4, "QUOTE_PAIR": 3},
+      "fill_count": 0,
+      "histories": {
+        "YES": [[3, "SUBMIT", "0"], [4, "ACK", "0"], [6, "CANCEL_REQUEST", "0"], [7, "CANCEL_ACK", "0"]],
+        "NO": [[3, "SUBMIT", "0"], [4, "ACK", "0"], [6, "CANCEL_REQUEST", "0"], [7, "CANCEL_ACK", "0"]]
+      },
+      "ledger_history": [[0, "1000", "0", "0"], [3, "1000", "4", "0"], [7, "1000", "0", "0"]]
+    },
+    "CONSERVATIVE": {
+      "cash": "999.2",
+      "reserved": "0",
+      "acquisition_basis": "0.8",
+      "realized_pnl": "0",
+      "liquidation_pnl": "-0.8",
+      "positions": [["YES", "2", "0.8"]],
+      "actions": {"NO_QUOTE": 4, "QUOTE_PAIR": 3},
+      "fill_count": 2,
+      "histories": {
+        "YES": [[3, "SUBMIT", "0"], [4, "ACK", "0"], [5, "FILL", "1"], [6, "CANCEL_REQUEST", "0"], [6, "FILL", "1"], [7, "CANCEL_ACK", "0"]],
+        "NO": [[3, "SUBMIT", "0"], [4, "ACK", "0"], [6, "CANCEL_REQUEST", "0"], [7, "CANCEL_ACK", "0"]]
+      },
+      "ledger_history": [[0, "1000", "0", "0"], [3, "1000", "4", "0"], [5, "999.6", "3.6", "0.4"], [6, "999.2", "3.2", "0.8"], [7, "999.2", "0", "0.8"]]
+    },
+    "SENSITIVITY": {
+      "cash": "999.2",
+      "reserved": "0",
+      "acquisition_basis": "0.8",
+      "realized_pnl": "0",
+      "liquidation_pnl": "-0.8",
+      "positions": [["YES", "2", "0.8"]],
+      "actions": {"NO_QUOTE": 4, "QUOTE_PAIR": 3},
+      "fill_count": 2,
+      "histories": {
+        "YES": [[3, "SUBMIT", "0"], [4, "ACK", "0"], [5, "FILL", "1"], [6, "CANCEL_REQUEST", "0"], [6, "FILL", "1"], [7, "CANCEL_ACK", "0"]],
+        "NO": [[3, "SUBMIT", "0"], [4, "ACK", "0"], [6, "CANCEL_REQUEST", "0"], [7, "CANCEL_ACK", "0"]]
+      },
+      "ledger_history": [[0, "1000", "0", "0"], [3, "1000", "4", "0"], [5, "999.6", "3.6", "0.4"], [6, "999.2", "3.2", "0.8"], [7, "999.2", "0", "0.8"]]
+    }
+  }
+}

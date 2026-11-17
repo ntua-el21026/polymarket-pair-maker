@@ -39,6 +39,18 @@ def check_repository() -> tuple[str, ...]:
             or hashlib.sha256(path.read_bytes()).hexdigest() != record["sha256"]
         ):
             failures.append(f"preserved fixture changed: {relative}")
+    paper_inventory = cast(
+        dict[str, object],
+        json.loads((ROOT / "tests/golden/paper-fixture-integrity.json").read_text()),
+    )
+    for record in cast(list[dict[str, object]], paper_inventory["files"]):
+        relative = str(record["path"])
+        path = ROOT / relative
+        if not path.is_file() or (
+            path.stat().st_size != record["bytes"]
+            or hashlib.sha256(path.read_bytes()).hexdigest() != record["sha256"]
+        ):
+            failures.append(f"synthetic paper fixture changed: {relative}")
     historical = cast(
         dict[str, object], json.loads((ROOT / "docs/historical/documents.json").read_text())
     )
@@ -77,7 +89,10 @@ def main() -> int:
         print(failure)
     if failures:
         return 1
-    print("Package identity, active links, 15 fixtures and five historical documents verified.")
+    print(
+        "Package identity, active links, 15 preserved fixtures, four synthetic fixtures "
+        "and five historical documents verified."
+    )
     return 0
 
 

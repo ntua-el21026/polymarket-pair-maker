@@ -1,0 +1,52 @@
+# Engineering defaults, not fitted trading parameters. All decimal values are
+# strings. The three queue scenarios run as independent portfolios, never summed.
+schema_version = "ppm-paper-config-v1"
+code_version = "ppm-paper-v1"
+starting_capital = "1000"
+maximum_input_records = 100000
+maximum_output_bytes = 268435456
+maximum_ledger_records = 100000
+inventory_exit_policy = "ON_ABSTENTION_OR_STOP_V1"
+exit_slippage_fraction = "0.001"
+exit_impact_fraction = "0.001"
+# Optional strict evidence document relative to this config file. Without it,
+# real journal replay reports unavailable rules/calibration and abstains.
+# evidence_file = "local-paper-evidence.json"
+
+[strategy]
+price_offsets_ticks = [0, -1, -2]
+size_multipliers = [1, 2]
+maximum_markets = 8
+maximum_book_age_ns = 5000000000
+minimum_time_to_resolution_ns = 3600000000000
+maximum_reference_age_ns = 86400000000000
+minimum_replace_interval_ns = 5000000000
+maximum_quote_age_ns = 60000000000
+hysteresis_improvement = "0.0001"
+capital_charge_rate = "0.0001"
+tail_charge_rate = "0.001"
+maximum_downside = "25"
+minimum_exit_depth = "5"
+cache_capacity = 256
+
+[risk]
+maximum_market_commitment = "25"
+maximum_parent_commitment = "50"
+maximum_total_commitment = "100"
+maximum_directional_inventory = "25"
+maximum_session_loss = "25"
+maximum_active_markets = 1
+maximum_active_orders = 2
+maximum_quote_age_ns = 60000000000
+maximum_market_data_age_ns = 5000000000
+minimum_time_to_resolution_ns = 3600000000000
+
+[execution]
+submission_latency_ns = 100000000
+cancellation_latency_ns = 100000000
+scenario = "CONSERVATIVE"
+unknown_queue_buffer = "2"
+inferred_pressure_fraction = "0.25"
+maximum_events = 100000
+maximum_orders = 10000
+seed = 0

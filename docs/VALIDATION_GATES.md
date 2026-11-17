@@ -58,7 +58,7 @@ calibration are separate empirical commands, not prerequisites for offline tests
 
 ## Gate B — Strategy implementation
 
-Prompt 2 must implement and test the deterministic decision engine specified in
+Task 2 implements and tests the deterministic decision engine specified in
 [STRATEGY_SPEC.md](STRATEGY_SPEC.md), including all four actions, eligibility
 gates, bounded candidate generation, correct reward formulas, cost separation,
 inventory/cash accounting, risk reservations, and conservative maker-fill
@@ -71,7 +71,37 @@ unknown reference data, budget limits, and rejection paths. A positive synthetic
 opportunity is not evidence of realizable profit. Collector acceptance gaps stay
 visible and block claims dependent on reliable empirical market data.
 
-Gate B is unexecuted at migration. This task does not implement its deliverables.
+The implementation handoff records actual Task 2 commands, counts, failures,
+skips, deterministic hashes and a Gate B verdict. This specification does not
+replace that execution evidence. The synthetic suite covers all four actions,
+reward grouping/bounds/unknowns, fees, queue scenarios, lifecycle races, atomic
+reservations, accounting and replay integrity. Official-source gaps intentionally
+block real-market admission, rather than being waived for a positive demo.
+
+### Paper reproduction
+
+Use fresh output locations; existing output is never overwritten:
+
+```bash
+mkdir -p data/paper
+uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-a
+uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-b
+diff -r data/paper/demo-a data/paper/demo-b
+uv run --frozen --all-groups ppm paper replay data/raw --run-id <run-id> --config config/phase1.toml --paper-config config/paper.toml --output data/paper/<fresh-session>
+uv run --frozen --all-groups pytest -q tests/unit tests/property tests/integration tests/golden
+uv run --frozen --all-groups python -m benchmarks.paper_system --iterations 200 --output data/paper-benchmark.json
+```
+
+The default paper config has no empirical evidence. A complete real journal may
+therefore produce a valid abstaining session. Corrupt/incomplete runs must be
+rejected. A separately prepared offline evidence document binds economic rules,
+calibration and collector qualification to a run/completion hash; a bare claim
+or synthetic fixture cannot satisfy empirical qualification.
+
+The benchmark measures decision evaluation, reward arithmetic and paper event
+throughput with runtime/host/workload and bounded-state evidence. Setup is
+outside measured loops. Local timing is not venue latency or an independent
+performance acceptance result. No new long collector soak is part of Task 2.
 
 ## Gate C — Independent acceptance
 

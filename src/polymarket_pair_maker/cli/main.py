@@ -135,6 +135,19 @@ def _parser() -> argparse.ArgumentParser:
     )
     validate.add_argument("target", type=Path)
 
+    paper = commands.add_parser("paper", help="offline internal paper simulation; no venue orders")
+    paper_commands = paper.add_subparsers(dest="paper_command", required=True)
+    paper_replay = paper_commands.add_parser(
+        "replay", help="paper replay of a verified completed journal"
+    )
+    paper_replay.add_argument("target", type=Path)
+    paper_replay.add_argument("--run-id", required=True)
+    paper_demo = paper_commands.add_parser("demo", help="run the committed SYNTHETIC paper fixture")
+    for command in (paper_replay, paper_demo):
+        command.add_argument("--paper-config", type=Path, default=Path("config/paper.toml"))
+        command.add_argument("--output", type=Path, required=True, help="fresh output directory")
+        _config_argument(command)
+
     return parser
 
 
@@ -309,6 +322,65 @@ def _validate(args: argparse.Namespace) -> int:
     return EXIT_OK if report.valid else EXIT_DATA_INVALID
 
 
+def _paper(args: argparse.Namespace) -> int:
+    from polymarket_pair_maker.journal import JournalCorruptionError
+    from polymarket_pair_maker.paper.config import load_paper_config
+    from polymarket_pair_maker.paper.demo import run_demo
+    from polymarket_pair_maker.paper.evidence import load_paper_evidence
+    from polymarket_pair_maker.paper.replay import replay_paper
+
+    config_path: Path = args.config
+    paper_path: Path = args.paper_config
+    output: Path = args.output
+    try:
+        config = load_phase1_config(config_path)
+        paper_config = load_paper_config(paper_path)
+        commit = _git_commit(_workspace_root(config_path))
+        if args.paper_command == "demo":
+            report = run_demo(
+                paper_config,
+                config,
+                output=output,
+                code_commit=commit,
+                protected_inputs=(config_path, paper_path),
+            )
+        else:
+            evidence_path = (
+                None
+                if paper_config.evidence_file is None
+                else paper_path.parent / paper_config.evidence_file
+            )
+            evidence = None if evidence_path is None else load_paper_evidence(evidence_path)
+            protected = (config_path, paper_path) + (
+                () if evidence_path is None else (evidence_path,)
+            )
+            report = replay_paper(
+                args.target,
+                CollectorRunId(args.run_id),
+                config,
+                paper_config,
+                output=output,
+                code_commit=commit,
+                evidence=evidence,
+                protected_inputs=protected,
+            )
+    except JournalCorruptionError as error:
+        _print({"status": "BLOCKED", "error_type": type(error).__name__, "reason": str(error)})
+        return EXIT_DATA_INVALID
+    except (ValueError, TypeError, OSError) as error:
+        _print({"status": "BLOCKED", "error_type": type(error).__name__, "reason": str(error)})
+        return EXIT_CONFIGURATION
+    _print(
+        {
+            "status": report["status"],
+            "classification": report["classification"],
+            "terminal_result_hash": report["terminal_result_hash"],
+            "raw_record_count": report["raw_record_count"],
+        }
+    )
+    return EXIT_OK if report["status"] == "COMPLETED" else EXIT_DATA_INVALID
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the focused CLI and translate expected faults into useful exit codes."""
 
@@ -325,6 +397,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _rebuild_analytical(args)
         if args.command == "validate-data":
             return _validate(args)
+        if args.command == "paper":
+            return _paper(args)
     except (ConfigurationFault, ValueError, OSError) as error:
         print(f"configuration/data error: {error}", file=sys.stderr)
         return EXIT_CONFIGURATION

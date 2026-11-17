@@ -1,8 +1,9 @@
 # Conservative Adaptive Pair Making
 
-This is the normative contract for Prompt 2. The decision engine, reward model,
-inventory ledger and paper order lifecycle are specified here and remain
-unimplemented after the migration. Their profitability is empirically unvalidated.
+This is the implemented Task 2 strategy contract. The decision engine, reward
+mathematics, inventory ledger and paper lifecycle have controlled regression
+tests. Their profitability is empirically unvalidated. Real-market admission
+remains blocked when authoritative rules or trustworthy calibration are absent.
 The sole objective is risk-adjusted realized net profitability from selective
 liquidity provision on the international Polymarket CLOB. `NO_QUOTE` is a valid,
 often optimal decision.
@@ -46,7 +47,7 @@ reason. Deterministic ties prefer lower exposure, then stable candidate ordering
 
 ## International liquidity rewards
 
-Reference checked on 2026-11-16: [official methodology](https://docs.polymarket.com/programs/liquidity-rewards)
+Reference checked on 2026-11-17: [official methodology](https://docs.polymarket.com/programs/liquidity-rewards)
 and [market settings](https://docs.polymarket.com/market-data/market-details).
 Use the size-cutoff-adjusted midpoint, not an unfiltered best-price average.
 For qualifying size within maximum distance `v`, score per share is
@@ -72,13 +73,25 @@ requires at least $1 earned for a day; smaller amounts are unpaid and do not rol
 over. Payment is around midnight UTC. Apply the floor to reward earnings, not
 net P&L. Do not infer undocumented per-market aggregation from third-party code.
 
-Prompt 2 must specify and test the precise size-cutoff midpoint reconstruction,
-complementary-book grouping, boundary units and rounding against authoritative
-examples and available venue scoring observations. Fail closed when those rules
-or qualifying depth cannot be established. Recompute qualification after inserting
-our hypothetical quotes: they can move the midpoint. Preserve original book
-observations separately. Polymarket US and perpetual-market incentives supply no
-parameters to this model.
+The official pages specify minimum size in shares and maximum spread in cents,
+but do not specify the size-cutoff midpoint aggregation or rounding algorithm.
+Consequently `RewardRules.midpoint_convention=None` is the current real-market
+outcome, and strategy admission fails closed. An independently documented and
+tested venue convention would require a subsequent implementation change; a
+configuration flag cannot promote the synthetic convention into venue truth.
+
+The **SYNTHETIC** fixture convention projects YES bids/NO asks to one economic
+bid side and YES asks/NO bids to the economic ask side, aggregates each price,
+walks cumulative quantity to the cutoff, and averages the two cutoff prices
+without rounding. Hypothetical orders participate in midpoint reconstruction
+but remain outside competitor mass. Canonical books remain immutable. This
+declared fixture algorithm tests cutoff depth and counterfactual midpoint
+movement; it is not an asserted Polymarket reconstruction algorithm.
+
+Regression tests reproduce both printed worked-example numeric expressions.
+The official Step 3 order labels contradict the complementary grouping in its
+Equations 2/3; tests preserve that discrepancy and use the equations for actual
+grouping. Polymarket US and perpetual incentives supply no model parameters.
 
 ## Proposed wallet-independent reward-share bound
 
@@ -128,8 +141,12 @@ earn no maker rebate. Category percentages can change.
 `shares * feeRate * p * (1-p)`, zero maker fees, and five-decimal fee rounding.
 Validate the applicable market, protocol, fee version, collateral/reward asset,
 rounding and effective time rather than fixing these observations in code.
-Current pages mix legacy USDC field names and pUSD descriptions; the reference
-model must identify assets explicitly and reject an unresolved mismatch.
+Current pages mix legacy USDC field names and pUSD descriptions. They state
+five-decimal precision and a sub-quantum zero rule without specifying a
+tie-rounding mode. The new fee model requires an explicit asset and rounding
+reference and rejects unresolved mismatch/rounding. Synthetic tests declare
+their own rounding mode; they do not amend the retained foundation cost rules
+or establish a live fee convention.
 
 Maintain a cash-and-position ledger as the authoritative economic identity:
 terminal wealth minus initial wealth, adjusted for external flows, with all fills,
@@ -139,10 +156,31 @@ post-fill adverse selection, capital commitment and tail exposure as
 reconcilable attribution. Complete-set payout and mark-to-market cannot both
 count the same gain. Estimated incentives remain estimates until reconciliation.
 
-Rank candidates by a conservative estimate of realized net wealth change less
-declared capital and tail-risk charges over a fixed horizon. Prompt 2 must freeze
-the estimators, horizon, risk limits, uncertainty scenarios and calibration data
-before confirmation. Rewards cannot be assumed to rescue losing execution.
+Rank candidates by conservative net wealth change per committed capital after
+declared capital and tail-risk charges. Objective
+`ppm-robust-execution-return-on-capital-v1` uses prior
+calibrated fill/markout scenarios, maker and conservative taker exit fees,
+liquidation/slippage/impact assumptions and downside exposure. All required
+scenarios must remain positive. Potential reward and maker rebate contributions
+are zero for admission. Ties prefer higher conservative economic score, lower
+downside, lower capital, then stable candidate identity.
+
+The configured grid has up to three price offsets and two size multipliers for
+each outcome: at most six single-leg candidates per outcome and 36 pairs, plus
+`NO_QUOTE` (49 total). One market and one passive bid per outcome can be active.
+Bounded ranking preserves all excluded-market reasons. Cached candidate
+evaluation invalidates on relevant books, references, calibration, capacity or
+configuration. Minimum replacement intervals and hysteresis reduce churn;
+safety invalidation bypasses them immediately in the paper lifecycle.
+
+Estimator `ppm-prior-empirical-scenarios-v1` requires prior chronological observations, declared source hashes,
+versions and separate evaluation periods. It includes 1s/10s/60s/300s markouts;
+absent future observations are missing. Synthetic calibration establishes test
+behavior only. The default real replay has no trustworthy empirical calibration
+and therefore abstains. Freeze independent calibration and scenario choices
+before Task 3 confirmation. Sample minima, maxima and means are declared
+descriptive scenarios, not population confidence bounds. Adverse scenarios use
+an upper rounded fill fraction; favorable scenarios use a lower rounded fraction.
 
 ## Fill model and lifecycle
 
@@ -153,6 +191,30 @@ reductions do not automatically establish trades or cancellations ahead of us.
 Declare pessimistic queue scenarios and prevent reuse of historical liquidity
 across simulated fills. Account for fill-after-cancel-request and deduplicate
 execution reports; release reservations only on a reconciled terminal outcome.
+
+The internal state machine implements created, pending acknowledgement, resting,
+partial fill, filled, cancel requested, cancelled, expired, rejected and unknown
+states. Pending/uncertain orders and cancellation races retain reservations.
+Contradictory reports fail closed; duplicates are idempotent. Strict pessimistic,
+bounded conservative and sensitivity queue assumptions run as independent
+portfolios. Public depth changes do not identify cancellations or executions
+without additional evidence. Historical pressure has a shared consumption
+budget per scenario, and simulated fills never claim verified venue execution.
+Latency transitions occur at recorded availability boundaries. Delayed execution
+evidence that overlaps a prior simulated acknowledgement/cancellation requires
+reconciliation and fails closed when that reconciliation cannot be established.
+Transport loss leaves uncertain orders and reservations explicit.
+
+Inventory exit policy `ON_ABSTENTION_OR_STOP_V1` requests an internal taker sweep
+after abstention or a risk stop. It waits for all potentially executable orders
+to reconcile, then uses accepted fresh bid depth at the next recorded boundary.
+Each exit charges explicit taker fees, slippage and impact. Consumed depth is
+tracked per instrument and price for the session, including subsequent executable
+valuations. Freshness, metadata and unrelated price updates do not replenish it;
+this conservative rule can understate actual new liquidity. Missing depth or fee
+references leaves inventory unresolved; partial exits retain the remainder. A
+disconnected session keeps its halt and unknown orders until explicit reconciliation, so it cannot silently
+liquidate against stale observations or fabricate a terminal cancellation.
 
 Evaluate depth-aware liquidation, post-fill markouts at declared horizons and
 exposure through resolution. Estimate benign queue-clearing opportunities
@@ -171,8 +233,8 @@ benchmarks must include failure/recovery paths. A complex optimizer, machine
 learning model or another implementation language requires benchmark evidence
 and separate authorization.
 
-Prompt 2 implements the deterministic engine, reference rules, paper lifecycle,
+Task 2 implements the deterministic engine, reference rules, paper lifecycle,
 conservative fills, risk reservations and accounting with meaningful tests.
-Prompt 3 evaluates independent acceptance. Historical or paper profit does not
+Task 3 evaluates independent acceptance. Historical or paper profit does not
 authorize live orders. No signed order adapter, trading credentials or live toggle
 is part of this specification's authorized implementation.

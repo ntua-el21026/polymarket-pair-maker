@@ -1,8 +1,8 @@
 # Invariants
 
-These requirements govern retained functionality and future Prompt 2 work.
-Requirements for fills, inventory, rewards, and paper orders are normative
-acceptance criteria; they do not claim those systems already exist.
+These requirements govern the retained foundation and implemented Task 2 paper
+system. Local regression evidence and independent empirical acceptance remain
+distinct; the implementation handoff records executed checks.
 
 ## Retained data foundation
 
@@ -43,7 +43,7 @@ acceptance criteria; they do not claim those systems already exist.
     tokens in the same condition, with explicit payout asset and settlement
     rules. UI similarity and price sums do not prove a settlement relationship.
 
-## Future strategy and paper execution
+## Strategy and paper execution
 
 12. **Optional exposure.** Every decision permits `NO_QUOTE`. A pair is optional;
     no rule requires symmetric quoting or participation in an ineligible market.
@@ -65,6 +65,24 @@ acceptance criteria; they do not claim those systems already exist.
     live-order transport. A future live-capable task requires explicit user
     authorization, authoritative eligibility verification, and separate
     acceptance. Historical/paper P&L does not grant that authorization.
+18. **Economic evidence boundaries.** Synthetic midpoint, fee or calibration
+    conventions cannot qualify observed market data. Unsupported midpoint
+    reconstruction, unknown rounding, asset mismatches and incomplete competitor
+    depth stay unavailable. A snapshot share bound cannot establish daily income.
+19. **Causal estimation.** Calibration precedes evaluation and uses observations
+    whose availability is already known. Missing 1s/10s/60s/300s markouts remain
+    missing. Training and evaluation periods cannot overlap.
+20. **Independent scenarios and liquidity budgets.** Pessimistic, conservative
+    and sensitivity portfolios are separate. A pressure event cannot fund more
+    than its declared liquidity across hypothetical orders; a price touch or
+    unattributed depth reduction is never a verified execution.
+21. **Daily incentive integrity.** UTC-day samples are deduplicated; contradictory
+    identities fail. Payout thresholds apply to complete scoped daily earnings,
+    with no liquidity-reward rollover. Estimated rewards/rebates and verified
+    payments occupy separate fields. Paper code cannot create verified payments.
+22. **Fresh derived destinations.** Paper output cannot overlap raw journals or
+    replace existing results. Runtime provenance and terminal content hashes
+    identify each reproducible result independently of historical processor hashes.
 
 Validation must preserve negative findings and unavailable evidence.
 Migration checks, strategy tests, and empirical acceptance remain separate under

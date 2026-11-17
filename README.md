@@ -7,10 +7,13 @@ international Polymarket CLOB. Decisions must maximize realistic risk-adjusted n
 profitability after adverse selection, execution costs, reward uncertainty, and
 capital exposure. `NO_QUOTE` is a valid and often optimal decision.
 
-The current code provides a **read-only market-data and replay foundation**.
-The market-making decision engine, maker-fill simulator, inventory accounting,
-reward estimator, and paper-order lifecycle are specified for the next task and
-are not implemented. Live order placement is structurally unavailable.
+The code implements a **read-only market-data foundation and deterministic paper
+system**: bounded adaptive YES/NO quote decisions, exact economics, causal
+calibration, simulated queues and orders, collateral reservations and inventory
+accounting. Controlled fixtures exercise these components. Real-market
+profitability and collector acceptance remain unvalidated. Missing reference or
+calibration evidence produces `NO_QUOTE`. Live order placement is structurally
+unavailable.
 
 ## Read first
 
@@ -19,11 +22,12 @@ are not implemented. Live order placement is structurally unavailable.
 | [Project specification](docs/PROJECT_SPEC.md) | Scope, operational modes, deliverables, and implementation status |
 | [Architecture](docs/ARCHITECTURE.md) | Module ownership, data flow, compatibility, and runtime policy |
 | [Invariants](docs/INVARIANTS.md) | Required correctness and safety contracts |
-| [Strategy specification](docs/STRATEGY_SPEC.md) | Normative contract for Prompt 2 |
+| [Strategy specification](docs/STRATEGY_SPEC.md) | Implemented strategy and empirical prerequisites |
 | [Research basis](docs/RESEARCH_BASIS.md) | Sources, findings, and implementation consequences |
 | [Validation gates](docs/VALIDATION_GATES.md) | Migration, implementation, and independent acceptance |
 | [Roadmap](docs/ROADMAP.md) | The agreed three-task sequence |
-| [Accepted decisions](docs/ADR/0001-foundation-and-safety-boundaries.md) | Foundation and compatibility decisions |
+| [Paper decisions](docs/ADR/0002-paper-economics-and-simulation.md) | Economic uncertainty and simulation contracts |
+| [SDK decision](docs/ADR/0003-defer-official-sdk.md) | Retained public transport and deferred SDK |
 | [Historical evidence](docs/historical/README.md) | Preserved failed-soak evidence and access limitations |
 
 ## Development
@@ -69,6 +73,53 @@ uv build
 Dependency-audit instructions and the distinction between local checks and
 empirical acceptance are in [Validation gates](docs/VALIDATION_GATES.md).
 GitHub Actions remains owner-paused; local commands provide reviewable evidence.
+
+## Paper execution
+
+Run the committed **SYNTHETIC** fixture in a fresh output directory:
+
+```bash
+mkdir -p data/paper
+uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-a
+uv run --frozen --all-groups ppm paper demo --paper-config config/paper.toml --output data/paper/demo-b
+diff -r data/paper/demo-a data/paper/demo-b
+```
+
+Replay a complete, integrity-verified raw run without network access:
+
+```bash
+uv run --frozen --all-groups ppm paper replay data/raw --run-id <run-id> --config config/phase1.toml --paper-config config/paper.toml --output data/paper/<fresh-session>
+```
+
+`config/paper.toml` declares exact decimal assumptions, bounds and engineering
+risk defaults: 1,000 simulated payout units, 25 committed per market, 100 total,
+one active market and two passive bids. Its optional `evidence_file` points to a
+strict offline evidence document relative to the configuration file. The default
+has no empirical calibration or independently qualified economic references;
+real journal replay therefore abstains. The official size-cutoff midpoint
+reconstruction and fee denomination/rounding need additional authoritative
+evidence. The demo's explicitly synthetic conventions cannot qualify real data.
+
+Three queue scenarios run as independent portfolios. Outputs distinguish
+observations, simulated execution, estimated incentives and unavailable verified
+payments. The positive demo case is a positive **SYNTHETIC quote decision**, not
+realized profit. Its stress ending leaves two YES tokens unresolved and 999.2
+simulated collateral in the conservative/sensitivity portfolios; the pessimistic
+portfolio does not assume a fill with unknown priority. Missing exit depth is
+preserved, rather than assigning a favorable terminal sale or payout.
+Session manifests retain input/configuration/rule/calibration identities,
+runtime provenance and deterministic result hashes. Raw evidence is never an
+output destination; existing output directories are rejected.
+
+```bash
+uv run --frozen --all-groups pytest -q tests/unit tests/property tests/integration tests/golden
+uv run --frozen --all-groups python -m benchmarks.paper_system --iterations 200 --output data/paper-benchmark.json
+```
+
+The benchmark records its runtime, host and bounded workload; its measurements
+do not establish venue execution performance. Task 2 execution evidence and
+Gate B results are reported in the implementation handoff. Task 3 remains an
+independent empirical evaluation.
 
 ## Acceptance and deployment status
 

@@ -1,6 +1,7 @@
 # Research basis
 
-Sources were checked on 2026-11-16. Findings below describe their authors'
+Academic and reference-project sources were checked on 2026-11-16; Task 2
+official economics pages were rechecked on 2026-11-17. Findings below describe their authors'
 evidence or models; implementation consequences are our design choices. No
 external performance result establishes profitability of this project.
 
@@ -63,14 +64,49 @@ Python metadata allows `>=3.11` but advertised classifiers stop at 3.13, so the
 project's exact 3.14.7 runtime still needs executed compatibility qualification.
 The SDK is deliberately absent from the migration lock.
 
-Prompt 2 must select a reviewed SDK version, resolve its full transitive graph,
-decide whether to adapt/test the retained collector on a compatible WebSocket
-release or wait for a compatible SDK, and test schemas, decimal conversion,
-retry/reconnect, order/fill decoding and replay parity. Do not relax pins silently
-or enable optional frame extras without need. Any account-interface specification
-must preserve the release's filtering/fill rules; authenticated order placement
-remains separately blocked. Public/reference integration is sufficient for the
-authorized paper implementation.
+Task 2 explicitly **defers the SDK** and retains validated public HTTPX/WebSocket
+transport, exact dependency pins and replay contracts. No SDK, authenticated
+adapter or Arrow extra is added. Current authoritative references unavailable
+through established public schemas remain unavailable in paper replay rather
+than using an invented endpoint. A separately authorized future integration must
+resolve the graph and qualify the exact runtime before revisiting this decision.
+See [ADR-0003](ADR/0003-defer-official-sdk.md).
+
+## Task 2 official economic references and limitations
+
+The [liquidity methodology](https://docs.polymarket.com/programs/liquidity-rewards)
+defines complementary side grouping, quadratic score, inclusive middle-range
+boundaries, divisor, age exceptions and randomized daily sampling. The
+[market settings](https://docs.polymarket.com/market-data/market-details) identify
+size in shares, spread in cents and dated allocations. Neither supplies a
+reproducible cutoff midpoint aggregation/rounding algorithm. Its Step 3 example
+also has order labels inconsistent with the displayed grouping equations.
+The implementation preserves exact arithmetic and tests numeric expressions;
+production midpoint reconstruction is explicitly unavailable. A separately
+named synthetic cumulative-depth convention exercises hypothetical midpoint
+movement without asserting a venue rule.
+
+The [fee page](https://docs.polymarket.com/trading/fees) supplies the fee curve,
+zero maker execution fee and five-decimal precision; the
+[rebate page](https://docs.polymarket.com/programs/maker-rebates) supplies
+executed-maker fee-equivalent weighting, per-market competition and the payout
+minimum. Rounding ties are unspecified, and the pages differ on USDC/pUSD
+denomination. Versioned paper rules require explicit rounding and asset evidence;
+missing evidence blocks admission. Resting unfilled quotes and fee-free fills
+earn no fee-funded maker rebate. Maker rebate estimates remain separate from
+liquidity rewards and simulated execution cash.
+
+The [official payout explanation](https://help.polymarket.com/en/articles/13364466-liquidity-rewards)
+establishes independent UTC-day earnings, the $1 threshold and no rollover of
+smaller liquidity rewards. Implementation requires complete sampling and verified
+payout aggregation scope before estimating a daily payment. Public L2 cannot
+establish wallet eligibility, exact random sampling times or a complete upper
+bound on competitors. No actual wallet payout reconciliation exists in this
+paper-only implementation, and conservative incentive income is zero.
+
+These gaps are source findings, not empirical validation failures. Controlled
+fixtures test guarded behavior and the proposed mathematical bound. They supply
+no venue qualification, empirical edge or independent profitability acceptance.
 
 ## Proposed method and evidence limits
 

@@ -201,6 +201,8 @@ def test_cli_surface_contains_no_execution_or_account_command() -> None:
     assert command_literals == {
         "calibrate",
         "observe",
+        "paper",
+        "demo",
         "polymarket",
         "rebuild-analytical",
         "replay",
@@ -226,3 +228,56 @@ def test_negative_capability_test_itself_is_source_backed() -> None:
     assert inspect.getsourcefile(PolymarketPublicClient) == str(
         PRODUCTION_PACKAGE / "venues" / "polymarket" / "client.py"
     )
+
+
+def test_internal_paper_packages_have_no_network_or_process_transport() -> None:
+    forbidden = {
+        "httpx",
+        "websockets",
+        "socket",
+        "requests",
+        "urllib",
+        "subprocess",
+        "eth_account",
+        "web3",
+        "py_clob_client",
+    }
+    violations: list[str] = []
+    for path, tree in _production_trees():
+        relative = path.relative_to(PRODUCTION_PACKAGE)
+        if relative.parts[0] not in {"paper", "strategy", "risk", "economics"}:
+            continue
+        for node in ast.walk(tree):
+            roots: set[str]
+            if isinstance(node, ast.Import):
+                roots = {alias.name.partition(".")[0] for alias in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.module is not None:
+                roots = {node.module.partition(".")[0]}
+                if ".venues" in node.module:
+                    violations.append(f"{relative}:{node.lineno}:venue transport import")
+            else:
+                roots = set()
+            violations.extend(f"{relative}:{root}" for root in roots & forbidden)
+    assert violations == []
+
+
+def test_paper_configuration_has_no_account_or_live_transition_surface() -> None:
+    config = cast(dict[str, object], tomllib.loads((REPOSITORY / "config/paper.toml").read_text()))
+    observed = {key.casefold() for key, _ in _mapping_items(config)}
+    assert observed.isdisjoint(
+        {
+            "live",
+            "mode",
+            "transport",
+            "endpoint",
+            "wallet",
+            "signer",
+            "private_key",
+            "api_key",
+            "secret",
+            "auth",
+            "credentials",
+            "network",
+        }
+    )
+    assert config["schema_version"] == "ppm-paper-config-v1"

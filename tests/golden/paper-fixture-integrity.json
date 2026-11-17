@@ -1,0 +1,26 @@
+{
+  "schema_version": "ppm-paper-fixture-integrity-v1",
+  "classification": "SYNTHETIC",
+  "files": [
+    {
+      "path": "src/polymarket_pair_maker/paper/fixtures/synthetic-assumptions.json",
+      "bytes": 581,
+      "sha256": "bcfbf9aee504636c025ba961f81a8b61c28ad914ffb378cbae62a34dda3d4eef"
+    },
+    {
+      "path": "src/polymarket_pair_maker/paper/fixtures/synthetic-evidence.json",
+      "bytes": 9248,
+      "sha256": "0864e2b8a4641d7099deba5303369d9e88c6e85d38685f11edb099ffc6367b24"
+    },
+    {
+      "path": "src/polymarket_pair_maker/paper/fixtures/synthetic-source.json",
+      "bytes": 6437,
+      "sha256": "76ac7b2f229e093915e65dadf7a76319ba01c8be4f70ed291c8dc741a5f6fb61"
+    },
+    {
+      "path": "tests/golden/fixtures/paper_synthetic_session_v1.json",
+      "bytes": 2162,
+      "sha256": "76314600fe9335e2c3993ec826b3cadac802d702c6546a1cee0bf45e51ae5141"
+    }
+  ]
+}

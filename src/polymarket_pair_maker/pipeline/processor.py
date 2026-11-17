@@ -131,6 +131,7 @@ from .channels import (
     WS_MARKET,
     channel_native_id,
 )
+from .market_view import CanonicalMarketView
 from .transitions import (
     REPORTED_TOP_TRANSITION_EXPIRY_SCHEMA,
     ReportedTopTransition,
@@ -4249,6 +4250,50 @@ class CanonicalProcessor:
 
     def snapshots(self) -> tuple[ImmutableOrderBookSnapshot, ...]:
         return tuple(owner.snapshot() for owner in self.owners)
+
+    def market_view(
+        self, market_id: MarketId, *, observed_at: UtcTimestamp
+    ) -> CanonicalMarketView | None:
+        """Expose accepted state without mutating historical processor identities.
+
+        Consumers request only dirty or actively quoted markets. Audit/recovery
+        admission remains enforced even when raw owner snapshots look healthy.
+        The caller supplies the recorded decision time, never a wall-clock read.
+        """
+
+        bundle = self._registry.current(market_id)
+        if bundle is None:
+            return None
+        blocked = set(self.audit_ineligible_instruments)
+        blocked.update(self._pending_audit_divergences)
+        blocked.update(self._audit_replacement_captures)
+        instrument_ids = self._market_instruments.get(market_id, ())
+        books = tuple(
+            replace(
+                self._owners[instrument_id].snapshot(),
+                health=BookHealth.STALE,
+                invalidation_reason=None,
+            )
+            if instrument_id in blocked
+            else self._owners[instrument_id].snapshot()
+            for instrument_id in instrument_ids
+        )
+        proof = prove_binary_complement(bundle)
+        assessment = self._eligibility_evaluator.assess(
+            bundle=bundle,
+            proof=proof,
+            books=books,
+            observed_at=observed_at,
+            provenance=self._eligibility_provenance(bundle, books),
+        )
+        return CanonicalMarketView(
+            bundle=bundle,
+            proof=proof,
+            books=books,
+            assessment=assessment,
+            observed_at=observed_at,
+            audit_ineligible=bool(blocked.intersection(instrument_ids)),
+        )
 
     def summary(self) -> ProcessorSummary:
         snapshots = self.snapshots()

@@ -1259,6 +1259,23 @@ async def test_subcadence_disconnect_recovery_restores_gate1_current_eligibility
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _, service = _configured_service(tmp_path)
+    original_sampler_start = health_module.SupervisedProcessResourceSampler.start
+
+    async def start_with_initial_sample(
+        sampler: health_module.SupervisedProcessResourceSampler,
+    ) -> None:
+        await original_sampler_start(sampler)
+        # This positive recovery case requires resource evidence before its
+        # instantaneous stream ends. Bootstrap I/O need not yield long enough
+        # for the sampler thread to publish; synchronize on its actual result.
+        snapshot = await asyncio.wait_for(sampler.wait_for_initial_attempt(), timeout=5)
+        assert snapshot.latest is not None
+
+    monkeypatch.setattr(
+        health_module.SupervisedProcessResourceSampler,
+        "start",
+        start_with_initial_sample,
+    )
     monkeypatch.setattr(observe_module, "PolymarketPublicClient", _PublicClient)
     monkeypatch.setattr(
         PolymarketObservationService,
