@@ -10,6 +10,7 @@ from polymarket_pair_maker.core.ids import CollectorRunId, MarketId
 from polymarket_pair_maker.core.serialization import canonical_sha256
 from polymarket_pair_maker.core.time import UtcTimestamp
 from polymarket_pair_maker.journal import JournalReader
+from polymarket_pair_maker.paper import verification
 from polymarket_pair_maker.paper.artifacts import (
     PaperArtifacts,
     fresh_output,
@@ -74,7 +75,9 @@ def replay_paper(
     count = 0
     input_valid = True
     manifest: dict[str, object] = {
-        "schema_version": "ppm-paper-session-v1",
+        "schema_version": "ppm-paper-session-v2",
+        "artifact_schema_version": "ppm-paper-artifacts-v2",
+        "state_chain_version": "ppm-paper-state-chain-v2",
         "classification": "SYNTHETIC"
         if synthetic
         else "OBSERVED_MARKET_DATA_WITH_SIMULATED_EXECUTION",
@@ -166,7 +169,7 @@ def replay_paper(
         reports = tuple(session.report(views, now) for session in sessions)
         processor_summary = processor.summary()
         report: dict[str, object] = {
-            "schema_version": "ppm-paper-report-v1",
+            "schema_version": "ppm-paper-report-v2",
             "status": "COMPLETED" if input_valid else "BLOCKED_CANONICAL_INTEGRITY",
             "classification": manifest["classification"],
             "raw_record_count": count,
@@ -188,9 +191,12 @@ def replay_paper(
             }
         )
         artifacts.document("session-manifest.json", manifest)
+        artifacts.inventory()  # Flush every stream before independent read verification.
+        verification.verify_paper_artifacts(artifacts.staging)
         artifacts.publish()
         return report
     except BaseException as error:
+        artifacts.revoke_completion()
         with suppress(ValueError, OSError):
             artifacts.document(
                 "failure.json",

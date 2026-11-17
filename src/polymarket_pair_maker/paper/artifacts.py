@@ -120,3 +120,10 @@ class PaperArtifacts:
         for handle in self._handles.values():
             handle.close()
         self._handles.clear()
+
+    def revoke_completion(self) -> None:
+        """Remove only this fresh staging area's unpublished completion claim."""
+        handle = self._handles.pop("session-manifest.json", None)
+        if handle is not None:
+            handle.close()
+        (self.staging / "session-manifest.json").unlink(missing_ok=True)

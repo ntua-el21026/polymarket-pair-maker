@@ -87,3 +87,14 @@ distinct; the implementation handoff records executed checks.
 Validation must preserve negative findings and unavailable evidence.
 Migration checks, strategy tests, and empirical acceptance remain separate under
 [VALIDATION_GATES.md](VALIDATION_GATES.md).
+
+23. **Lossless paper normalization.** Every considered candidate, evaluation,
+    reason and exact economic field remains reconstructible. Compact decision
+    and market-selection references bind scenario, boundary and market; missing,
+    contradictory or cross-scope relationships fail. No candidate truncation,
+    sampling or inferred replacement is permitted.
+24. **Versioned artifact integrity.** V2 stream records have contiguous per-owner
+    indices, canonical bytes and validated scoped identities. Complete inventories,
+    state chains and terminal hashes are verified before atomic publication.
+    Historical formats retain explicit compatibility limits. A changed output
+    representation cannot claim equality with historical serialization hashes.

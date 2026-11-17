@@ -22,6 +22,7 @@ from polymarket_pair_maker.paper.execution import (
     QueueScenario,
 )
 from polymarket_pair_maker.paper.ledger import LiquidationQuote, PaperLedger
+from polymarket_pair_maker.paper.normalization import NormalizedArtifacts
 from polymarket_pair_maker.paper.orders import (
     Outcome,
     PaperOrderId,
@@ -89,12 +90,20 @@ class ScenarioSession:
                 pressure_lists.setdefault(item.ingest_seq, []).append(item.pressure)
         self._pressure_by_seq = {seq: tuple(items) for seq, items in pressure_lists.items()}
         self._pressure_boundaries_consumed: set[int] = set()
-        self._state_chain = canonical_sha256(("ppm-paper-state-chain-v1", scenario))
+        self._state_chain = canonical_sha256(("ppm-paper-state-chain-v2", scenario))
+        self._record_index = 0
+        self._normalized = NormalizedArtifacts(scenario, self._record)
 
     def _record(self, name: str, seq: int, value: object) -> None:
-        record = {"scenario": self.scenario, "ingest_seq": seq, "value": value}
+        record = {
+            "scenario": self.scenario,
+            "ingest_seq": seq,
+            "record_index": self._record_index,
+            "value": value,
+        }
         self.artifacts.append(name, record)
         self._state_chain = canonical_sha256((self._state_chain, name, record))
+        self._record_index += 1
 
     def _context(self, view: CanonicalMarketView, now: UtcTimestamp) -> MarketContext | None:
         proof = view.proof
@@ -161,9 +170,7 @@ class ScenarioSession:
         self.decisions[decision.action.value] += 1
         if decision.action is StrategyAction.NO_QUOTE:
             self.abstentions.update(decision.reasons)
-        self._record("decisions.jsonl", seq, decision)
-        if decision.evaluations:
-            self._record("economics.jsonl", seq, decision.evaluations)
+        self._normalized.decision(seq, decision)
         if not self.simulator.connected:
             return
         if decision.cancel_immediately:
@@ -315,7 +322,6 @@ class ScenarioSession:
                 if (context := self._context(views[key], now)) is not None
             )
             ranking = self.engine.evaluate_markets(contexts, current=self.active)
-            self._record("selection.jsonl", seq, ranking)
             selected = ranking.selected
             if selected is None:
                 reasons = tuple(
@@ -339,6 +345,13 @@ class ScenarioSession:
                     False,
                     canonical_sha256((seq, now, tuple(views))),
                 )
+            self._record(
+                "selection.jsonl",
+                seq,
+                self._normalized.ranking(
+                    seq, ranking, fallback=selected if ranking.selected is None else None
+                ),
+            )
             self._decision(seq, now, selected, books, views)
             for context in contexts:
                 if context.reward_rules is not None:

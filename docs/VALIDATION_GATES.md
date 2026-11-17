@@ -127,3 +127,28 @@ Gate C is unexecuted at migration. Historical or paper profitability alone
 does not authorize live execution. Live capability remains outside the
 three-task sequence and requires explicit authorization, verified legal/geographic
 eligibility, and its own acceptance gates.
+
+## Task 4 — Artifact remediation and performance requalification
+
+Require lossless typed reconstruction of every evaluation, decision and market
+ranking, exact economic equivalence to the original shared complete prefix,
+independent verification of the complete normalized run, and deterministic
+byte-identical results. V2 format/hash identities are distinct from v1; semantic
+accounting goldens and historical source evidence remain unchanged.
+
+The primary capacity workload retains all 1,004 records, all three scenarios,
+the original chronology and 49-candidate grid under 268,435,456 bytes. Verify the
+complete manifest before publication and report every stream's bytes. Repeat the
+applicable 6/100/1000-level replay workloads with setup separated from timing,
+three warmups, actual RSS and exact host/runtime/source/config/input identities.
+The Task 3 synthetic screens remain decision p99 <=100 ms and reward p99 <=20 ms
+at 49 candidates/1000 levels, complete replay >=100 raw records/s, RSS <2 GiB and
+comparable post-warmup growth <=64 MiB. A measured throughput failure remains a
+failure even if output capacity improves. Incomplete, altered or shortened runs
+cannot pass a complete replay screen.
+
+Synthetic engineering results do not supply representative observed arrival
+rates, 2x production headroom, collector qualification, venue-rule authority,
+execution calibration or empirical economic viability. Those gates remain
+independent and unavailable evidence cannot be promoted to PASS. The dedicated
+engineering report records Task 4's actual measurements and remaining blockers.

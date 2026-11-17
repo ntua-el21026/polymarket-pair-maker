@@ -191,3 +191,25 @@ contain synthetic rules/calibration/pressure. Hash and schema validation establi
 identity and consistency; independent source review must establish the truth of
 qualification/calibration declarations. The parser does not turn a supplied
 `PASS` label into independent collector acceptance.
+
+## Normalized paper artifact contract
+
+New sessions use `ppm-paper-session-v2` and `ppm-paper-artifacts-v2`.
+`paper/normalization.py` owns compact serialization and exact typed reconstruction;
+`paper/verification.py` checks completed inventories, canonical records, scoped
+references, chronology, state chains and terminal result identities. Full
+candidate evaluations have one authoritative payload representation with scoped
+boundary bindings; decisions and selections reference those bindings. Exact
+consecutive equal payloads reuse the latest per-market content, with bounded
+producer/reconstructor retention. Strategy dataclasses and
+policy retain their existing in-memory meanings. Per-scenario record indices
+make cross-stream ordering independently recoverable with bounded state. Fixed
+code-selected decoder schemas use a bounded metadata cache; validation still
+checks every input value.
+
+See [ADR-0004](ADR/0004-normalized-paper-artifacts.md) for the failure mechanism,
+version/compatibility boundary and integrity contract. The 256 MiB cumulative
+artifact budget and 16 MiB per-record bound remain enforced. Incomplete staging
+output is retained without a successful publication. Historical v1 results and
+raw sources remain read-only inputs; v2 serialization/state-chain hashes identify
+a new representation and are not compared as equal to historical hashes.

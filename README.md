@@ -142,3 +142,27 @@ paper-to-live switch, signer, wallet configuration, or live-order command.
 
 Maintained by **Michail Athanasios Peppas**. Credentials, collected journals,
 checkpoints, and large research artifacts belong outside tracked source.
+
+## Normalized paper output and verification
+
+New paper results use the explicit v2 artifact contract in
+[ADR-0004](docs/ADR/0004-normalized-paper-artifacts.md). Complete candidate grids
+are stored once and referenced by compact decisions and selections. The existing
+256 MiB cumulative bound remains unchanged. Replay verifies the completed
+inventory, scoped references, chronology, state chains and terminal result before
+atomic publication. Independently verify an existing completed result with:
+
+```bash
+uv run --frozen --all-groups python -m polymarket_pair_maker.paper.verification data/paper/<completed-session>
+```
+
+`iter_reconstructed_records(path)` in `paper.verification` yields exact typed
+`CandidateEvaluation` tuples, `StrategyDecision` and `MarketRanking` objects for
+the three normalized streams, and original values for the other streams.
+Exhaust the iterator to validate final state chains; `verify_paper_artifacts`
+always performs complete validation. Missing/conflicting references, modified
+content, malformed or truncated records and incorrect inventories fail explicitly.
+Legacy v1 completed results retain their original interpretation and container
+hash checks. Their absent cross-stream record indices prevent independent
+reconstruction of historical state-chain order; the verifier reports that limit.
+Raw evidence and historical artifact files are never migrated in place.
