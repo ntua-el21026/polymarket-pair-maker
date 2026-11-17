@@ -152,3 +152,24 @@ rates, 2x production headroom, collector qualification, venue-rule authority,
 execution calibration or empirical economic viability. Those gates remain
 independent and unavailable evidence cannot be promoted to PASS. The dedicated
 engineering report records Task 4's actual measurements and remaining blockers.
+
+## Task 5 — Measured computation reuse
+
+Profile complete existing workloads before optimization. Record inclusive and
+self CPU costs, call counts, pipeline phases, memory and actual source identities;
+diagnostic instrumentation does not qualify acceptance timings. Computation reuse
+must have exact immutable keys, bounded retention, defined eviction and stale or
+malformed-input regressions. See [ADR-0005](ADR/0005-evidence-based-computation-reuse.md).
+
+Require exact before/after stream bytes and reconstructed logical objects across
+all three scenarios, with only explicitly identified source-provenance metadata
+and its derived terminal/report hashes excluded. Retain historical v1/v2 readers,
+every baseline test identity and all engineering checks. Separately stress changing
+full evaluation grids, multiple markets, eviction/reappearance and actual output
+exhaustion; exhaustion must never publish successful completion.
+
+The unchanged formal 6/100/1000-level matrix retains all inputs, candidates,
+scenarios, three warmups, the timed fourth replay and required verification. The
+100 records/s, latency, memory, 300-second child deadline and artifact bounds above
+continue to apply. A faster incomplete or failed workload cannot pass. Synthetic
+qualification and representative production qualification remain separate.

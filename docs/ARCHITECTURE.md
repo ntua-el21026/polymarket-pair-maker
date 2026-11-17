@@ -213,3 +213,12 @@ artifact budget and 16 MiB per-record bound remain enforced. Incomplete staging
 output is retained without a successful publication. Historical v1 results and
 raw sources remain read-only inputs; v2 serialization/state-chain hashes identify
 a new representation and are not compared as equal to historical hashes.
+
+## Exact computation reuse
+
+[ADR-0005](ADR/0005-evidence-based-computation-reuse.md) records the measured
+Task 5 computation bottlenecks and cache contracts. Immutable snapshot identity
+and canonical encoding reuse preserve existing bytes and hash domains. Candidate
+generation and evaluation caches retain complete immutable keys with explicit
+bounds. Every decision still checks current data, references and calibration.
+The Task 4 v2 artifact format, verification and publication contract is retained.
