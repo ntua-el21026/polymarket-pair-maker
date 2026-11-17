@@ -522,9 +522,7 @@ class PaperSimulator:
             consumed = min(order.queue_ahead.value, remaining)
             remaining -= consumed
             queue_used += consumed
-            self._orders[order.intent.order_id] = replace(
-                order, queue_ahead=Quantity(order.queue_ahead.value - consumed)
-            )
+            queue_after = Quantity(order.queue_ahead.value - consumed)
             amount = min(order.remaining.value, remaining)
             if amount:
                 event = OrderEvent(
@@ -543,6 +541,11 @@ class PaperSimulator:
                 self.apply_event(event)
                 remaining -= amount
                 fills += amount
+            # A rejected fill must leave its queue untouched. Event/ledger
+            # capacity validation happens inside apply_event before this commit.
+            self._orders[order.intent.order_id] = replace(
+                self._orders[order.intent.order_id], queue_ahead=queue_after
+            )
         result = PressureResult(
             pressure.evidence_id,
             pressure.kind,

@@ -297,6 +297,15 @@ class ScenarioSession:
             if pressure.available_at != now:
                 raise ValueError("pressure availability must equal its recorded ingest boundary")
             self._record("pressure.jsonl", seq, self.simulator.process_pressure(pressure))
+        # Current fills and accepted depth can breach the loss limit at this
+        # boundary. Latch the stop before evaluating or reserving another quote.
+        if (
+            not self.risk.observe_wealth(
+                self.ledger, self.valuation(views, now)["executable_wealth"]
+            )
+            and self.simulator.connected
+        ):
+            self.simulator.safety_invalidate(now, reason=self.risk.halted_reason or "RISK_HALT")
         if not self.simulator.active_orders():
             self.active = None
         if dirty or not views:

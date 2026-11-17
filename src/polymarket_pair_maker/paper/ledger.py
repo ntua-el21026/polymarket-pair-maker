@@ -78,6 +78,27 @@ class LiquidationQuote:
     stress_value_of_unfilled: Money = field(default_factory=lambda: Money(ZERO))
     consumed_depth: tuple[tuple[str, ExactDecimal], ...] = ()
 
+    def __post_init__(self) -> None:
+        quantity = sum((leg.quantity.value for leg in self.legs), ZERO)
+        gross = sum((leg.price.value * leg.quantity.value for leg in self.legs), ZERO)
+        fees = sum((leg.fee.value for leg in self.legs), ZERO)
+        if any(
+            leg.quantity.value <= ZERO
+            or leg.fee.value < ZERO
+            or leg.fee.value > leg.price.value * leg.quantity.value
+            for leg in self.legs
+        ):
+            raise ValueError("invalid liquidation leg quantity or fee")
+        if (
+            quantity + self.unfilled.value != self.requested.value
+            or gross != self.gross_proceeds.value
+            or fees != self.fees.value
+            or self.net_proceeds.value
+            != gross - fees - self.slippage_cost.value - self.impact_cost.value
+            or min(self.net_proceeds.value, self.slippage_cost.value, self.impact_cost.value) < ZERO
+        ):
+            raise ValueError("liquidation quote fails exact reconciliation")
+
     @property
     def filled(self) -> Quantity:
         return Quantity(self.requested.value - self.unfilled.value)
@@ -496,6 +517,8 @@ class PaperLedger:
         evidence_id: str,
     ) -> bool:
         """Explicit simulated resolved-outcome contract; closing a book never calls this."""
+        if type(winning_outcome) is not Outcome:
+            raise TypeError("settlement outcome must be a typed Outcome")
         payload = ("SETTLEMENT", proof, winning_outcome, evidence_id)
         if not self._new_record(event_id, payload):
             return False
@@ -542,6 +565,15 @@ class PaperLedger:
     def _validate_proof(self, proof: BinarySemanticProof) -> None:
         if not proof.is_proven or proof.payout_asset_id != self.collateral_asset_id:
             raise ValueError("verified same-asset binary complement proof required")
+        for instrument_id, outcome in (
+            (proof.yes_instrument_id, Outcome.YES),
+            (proof.no_instrument_id, Outcome.NO),
+        ):
+            position = self._positions.get(instrument_id) if instrument_id is not None else None
+            if position is not None and (
+                position.market_id != proof.market_id or position.outcome is not outcome
+            ):
+                raise ValueError("held position identity contradicts complement proof")
 
     def mark_to_market(self, marks: Mapping[InstrumentId, Price]) -> Valuation:
         value = ZERO
