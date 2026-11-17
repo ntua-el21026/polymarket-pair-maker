@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -29,7 +30,7 @@ from polymarket_pair_maker.research.paper_calibration import (
     CalibrationSource,
 )
 from polymarket_pair_maker.semantic import prove_binary_complement
-from polymarket_pair_maker.state.order_books import ImmutableOrderBookSnapshot
+from polymarket_pair_maker.state.order_books import BookLevel, ImmutableOrderBookSnapshot
 
 ZERO = ExactDecimal.zero()
 ONE = ExactDecimal.one()
@@ -227,7 +228,16 @@ class MarketRanking:
     decisions: tuple[tuple[MarketId, StrategyDecision], ...]
 
 
-def _gate(context: MarketContext, config: StrategyConfig) -> tuple[str, ...]:
+def _sum_bid_quantities(bids: tuple[BookLevel, ...]) -> ExactDecimal:
+    return sum((level.quantity.value for level in bids), ZERO)
+
+
+def _gate(
+    context: MarketContext,
+    config: StrategyConfig,
+    *,
+    _bid_total: Callable[[tuple[BookLevel, ...]], ExactDecimal] = _sum_bid_quantities,
+) -> tuple[str, ...]:
     reasons: list[str] = []
     bundle, assessment, at = context.bundle, context.assessment, context.as_of
     if assessment.disposition is not EligibilityDisposition.ELIGIBLE:
@@ -286,10 +296,7 @@ def _gate(context: MarketContext, config: StrategyConfig) -> tuple[str, ...]:
             reasons.append("TWO_SIDED_DEPTH_REQUIRED")
         elif book.best_bid.price.value >= book.best_ask.price.value:
             reasons.append("CROSSED_BOOK")
-        if (
-            sum((level.quantity.value for level in book.bids), ZERO)
-            < config.minimum_exit_depth.value
-        ):
+        if _bid_total(book.bids) < config.minimum_exit_depth.value:
             reasons.append("INSUFFICIENT_EXECUTABLE_EXIT_DEPTH")
         if (
             book.market_version_id,
@@ -572,6 +579,44 @@ class DecisionEngine:
         self.context_cache_hits = 0
         self.context_cache_misses = 0
         self._context_cache: tuple[MarketId, bytes, object, str] | None = None
+        self._bid_totals: OrderedDict[int, tuple[tuple[BookLevel, ...], ExactDecimal]] = (
+            OrderedDict()
+        )
+
+    def _bid_total(self, bids: tuple[BookLevel, ...]) -> ExactDecimal:
+        # Strongly retained exact tuple identity prevents object-ID reuse. Only
+        # pure numeric totals are shared between gate/evaluation call sites.
+        key = id(bids)
+        previous = self._bid_totals.get(key)
+        if previous is not None and previous[0] is bids:
+            self._bid_totals.move_to_end(key)
+            return previous[1]
+        reusable = (
+            type(bids) is tuple
+            and len(bids) <= 4096
+            and all(
+                type(level) is BookLevel
+                and type(level.price) is Price
+                and type(level.quantity) is Quantity
+                and all(
+                    type(value) is ExactDecimal
+                    and type(value.coefficient) is int
+                    and type(value.scale) is int
+                    and value.coefficient.bit_length() <= 512
+                    and 0 <= value.scale <= 128
+                    for value in (level.price.value, level.quantity.value)
+                )
+                for level in bids
+            )
+        )
+        if not reusable:
+            self._bid_totals.clear()
+            return _sum_bid_quantities(bids)
+        result = _sum_bid_quantities(bids)
+        self._bid_totals[key] = (bids, result)
+        if len(self._bid_totals) > 2:
+            self._bid_totals.popitem(last=False)
+        return result
 
     @property
     def cached_evaluations(self) -> int:
@@ -693,7 +738,7 @@ class DecisionEngine:
         self, context: MarketContext, current: ActiveQuote | None = None
     ) -> StrategyDecision:
         input_hash = canonical_sha256((OBJECTIVE_VERSION, self.config, context, current))
-        reasons = _gate(context, self.config)
+        reasons = _gate(context, self.config, _bid_total=self._bid_total)
         if reasons:
             return StrategyDecision(
                 StrategyAction.NO_QUOTE, None, reasons, (), current is not None, False, input_hash
@@ -701,8 +746,8 @@ class DecisionEngine:
         candidates = self._candidates(context)
         context_hash = self._evaluation_context_hash(context)
         exit_depth = (
-            sum((level.quantity.value for level in context.yes_book.bids), ZERO),
-            sum((level.quantity.value for level in context.no_book.bids), ZERO),
+            self._bid_total(context.yes_book.bids),
+            self._bid_total(context.no_book.bids),
         )
         # At most two sizes per outcome: aggregate the relevant executable bid
         # sweeps once, then share them across all price and paired candidates.
